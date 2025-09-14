@@ -1,9 +1,0 @@
-EESchema-DOCLIB  Version 2.0
-#
-$CMP IS61LV25616AL-10TLI
-D 512K x 8 HIGH-SPEED CMOS STATIC RAM, 10ns, SOJ-36
-K SRAM MEMORY
-F http://www.issi.com/WW/pdf/61-64C5128AL.pdf
-$ENDCMP
-#
-#End Doc Library

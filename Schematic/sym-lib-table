@@ -1,8 +1,0 @@
-(sym_lib_table
-  (lib (name CH32_Library)(type Legacy)(uri ${KIPRJMOD}/CH32_Library.lib)(options "")(descr ""))
-  (lib (name audioled_Library)(type Legacy)(uri ${KIPRJMOD}/audioled_Library.lib)(options "")(descr ""))
-  (lib (name my_buttons_Library)(type Legacy)(uri ${KIPRJMOD}/my_buttons_Library.lib)(options "")(descr ""))
-  (lib (name nanoboard_Library)(type Legacy)(uri ${KIPRJMOD}/nanoboard_Library.lib)(options "")(descr ""))
-  (lib (name MYRAM_Library)(type Legacy)(uri ${KIPRJMOD}/MYRAM_Library.lib)(options "")(descr ""))
-  (lib (name ch32v307_100-rescue)(type Legacy)(uri ${KIPRJMOD}/ch32v307_100-rescue.lib)(options "")(descr ""))
-)
