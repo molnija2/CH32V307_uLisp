@@ -31,6 +31,9 @@
 
 #include "rtc.h"
 
+#include "ILI9488.h"
+#include "XPT2046.h"
+
 /* Global typedef */
 
 /* Global define */
@@ -38,8 +41,8 @@
 
 
 
-FSMC_NORSRAMTimingInitTypeDef FSMC_ReadWriteTimingStruct = {0} ;
-FSMC_NORSRAMInitTypeDef FSMC_NORSRAMInitStruct = {0} ;
+//FSMC_NORSRAMTimingInitTypeDef FSMC_ReadWriteTimingStruct = {0} ;
+//FSMC_NORSRAMInitTypeDef FSMC_NORSRAMInitStruct = {0} ;
 
 
 #define	GPIO_DATA_D		(GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_14|GPIO_Pin_15)
@@ -58,8 +61,8 @@ FSMC_NORSRAMInitTypeDef FSMC_NORSRAMInitStruct = {0} ;
 #define GPIO_NADV_B		GPIO_Pin_7
 
 
-GPIO_InitTypeDef  GPIO_Ddata_Inittructure ;
-GPIO_InitTypeDef  GPIO_Edata_Inittructure ;
+//GPIO_InitTypeDef  GPIO_Ddata_Inittructure ;
+//GPIO_InitTypeDef  GPIO_Edata_Inittructure ;
 
 
 
@@ -72,11 +75,11 @@ void	loop();
 
 
 
-char file_name[256] = "main_program.l" ;
+//const char file_name[] = "main_program.l" ;
 
 
 
-
+//const char string_mount_error[17] = "SD mount error\n";
 
 
 
@@ -88,16 +91,16 @@ void SRAM_gpio_init()
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB|RCC_APB2Periph_GPIOD|RCC_APB2Periph_GPIOE, ENABLE);
 
 	//   DATA pin
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1/*|GPIO_Pin_3*/
-    		|GPIO_Pin_4|GPIO_Pin_5/*|GPIO_Pin_6*/|GPIO_Pin_7
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1//|GPIO_Pin_3
+    		|GPIO_Pin_4|GPIO_Pin_5|GPIO_Pin_7 //|GPIO_Pin_6
 			|GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_11
 			|GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(GPIOD, &GPIO_InitStructure);
 
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1|/*GPIO_Pin_2|*/GPIO_Pin_3
-    		|GPIO_Pin_4|/*GPIO_Pin_5|GPIO_Pin_6|*/GPIO_Pin_7
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0|GPIO_Pin_1|GPIO_Pin_3 //|GPIO_Pin_2
+    		|GPIO_Pin_4|GPIO_Pin_7 // |GPIO_Pin_5|GPIO_Pin_6
 			|GPIO_Pin_8|GPIO_Pin_9|GPIO_Pin_10|GPIO_Pin_11
 			|GPIO_Pin_12|GPIO_Pin_13|GPIO_Pin_14|GPIO_Pin_15;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
@@ -112,6 +115,8 @@ void SRAM_gpio_init()
 
 void SRAM_init()
 {
+	FSMC_NORSRAMTimingInitTypeDef FSMC_ReadWriteTimingStruct = {0} ;
+	FSMC_NORSRAMInitTypeDef FSMC_NORSRAMInitStruct = {0} ;
 
 	SRAM_gpio_init();
 
@@ -148,7 +153,7 @@ void SRAM_init()
 }
 
 
-char TestBuffer[256] ;
+
 
 int SRAM_Test2 (int iN)
 {
@@ -203,21 +208,21 @@ int SRAM_Test2 (int iN)
 
 void USART_Getch_Init (uint32_t baudrate)
 {
-	GPIO_InitTypeDef  GPIO_InitStructure;
+	//GPIO_InitTypeDef  GPIO_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure = { 0 };
-	USART_InitTypeDef USART_InitStructure;
+	//USART_InitTypeDef USART_InitStructure;
 
 
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE) ;
+	//RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE) ;
 
 	//   RX - input pin
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+    /*GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     //GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOA, &GPIO_InitStructure);*/
 
 
-    USART_InitStructure.USART_BaudRate = baudrate;
+    /*USART_InitStructure.USART_BaudRate = baudrate;
     USART_InitStructure.USART_WordLength = USART_WordLength_8b;
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
     USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -225,7 +230,7 @@ void USART_Getch_Init (uint32_t baudrate)
     USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
     USART_Init(USART1, &USART_InitStructure);
 
-    USART_Cmd(USART1, ENABLE);
+    USART_Cmd(USART1, ENABLE);*/
 
 
     u32 temp ;
@@ -245,7 +250,7 @@ void USART_Getch_Init (uint32_t baudrate)
     temp &= 0xfffffff3 ;
     USART1->CTLR3 = temp | 0x0001; //  USART_IT_ERR*/
 
-    USART_Cmd(USART1, DISABLE);
+    //USART_Cmd(USART1, DISABLE);
 
    //USART_ReceiverWakeUpCmd(USART1, ENABLE) ;
 
@@ -256,16 +261,16 @@ void USART_Getch_Init (uint32_t baudrate)
     NVIC_InitStructure.NVIC_IRQChannelCmd = DISABLE;
     NVIC_Init( &NVIC_InitStructure );
 
-    USART_ClearFlag( USART1, USART_FLAG_RXNE );
+    /*USART_ClearFlag( USART1, USART_FLAG_RXNE );
     USART_ClearFlag( USART1, USART_FLAG_IDLE );
-    USART_ClearFlag( USART1, USART_FLAG_FE );
+    USART_ClearFlag( USART1, USART_FLAG_FE );*/
 
 
-    RxRecvPtr = cRxBuffer ;
+    /*RxRecvPtr = cRxBuffer ;
     RxRecvReadPtr = cRxBuffer ;
     uiRecvIndex = 0 ;
     uiRecvReadIndex = 0 ;
-    USART_Cmd(USART1, ENABLE);
+    USART_Cmd(USART1, ENABLE);*/
     //NVIC_EnableIRQ( USART1_IRQn );
 }
 
@@ -276,12 +281,12 @@ void USART_Getch_Init (uint32_t baudrate)
 void StartWaitUSART()
 {
 
-     iPackageLenght = 0 ;
      RxRecvPtr = cRxBuffer ;
-     CmdBufferPtr = cRxBuffer ;
-     iFlagPackageEnd = 0 ;
-
+     //CmdBufferPtr = cRxBuffer ;
      RxRecvReadPtr = cRxBuffer ;
+     //iPackageLenght = 0 ;
+     //iFlagPackageEnd = 0 ;
+
      uiRecvIndex = 0 ;
      uiRecvReadIndex = 0 ;
 
@@ -309,7 +314,7 @@ int getch ()
 }
 
 
-void MMC_GPIO_Init(void)
+/*void MMC_GPIO_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure={0};
 
@@ -322,17 +327,25 @@ void MMC_GPIO_Init(void)
     GPIO_Init( GPIOA, &GPIO_InitStructure );
 
     GPIOA->BSHR = GPIO_Pin_15; //CS H
-}
+}*/
 
 
 void SPI_SDD_Init(void){
-    GPIO_InitTypeDef GPIO_InitStructure={0};
-    SPI_InitTypeDef SPI_InitStructure={0};
+    GPIO_InitTypeDef GPIO_InitStructure;
+    SPI_InitTypeDef SPI_InitStructure;
 
     RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOB , ENABLE );
     RCC_APB2PeriphClockCmd( RCC_APB2Periph_SPI1, ENABLE);
     RCC_APB2PeriphClockCmd( RCC_APB2Periph_AFIO, ENABLE);
+    RCC_APB2PeriphClockCmd( RCC_APB2Periph_GPIOA, ENABLE);
 
+    //CS @ PA15
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init( GPIOA, &GPIO_InitStructure );
+
+    GPIOA->BSHR = GPIO_Pin_15; //CS H
 
 
     /* SPI_MOSI */
@@ -372,36 +385,6 @@ void SPI_SDD_Init(void){
 
 
 
-u8 sdcardtest()
-{
-	//return 1 ;
-
-    FATFS fatfs;
-    FIL fil;
-    UINT uint;
-    FRESULT fres;
-
-    fres = f_mount(&fatfs, "", 1);
-    if(fres != FR_OK)
-    	return 0 ;
-
-    fres = f_open(&fil, "test.txt",FA_CREATE_ALWAYS | FA_WRITE );
-    if(fres != FR_OK)
-    	return 0 ;
-    fres = f_write(&fil, "aaaa", 5, &uint);
-    if(fres != FR_OK)
-    	return 0 ;
-    fres = f_close(&fil);
-    if(fres != FR_OK)
-    	return 0 ;
-    fres =  f_unmount("");
-    if(fres != FR_OK)
-    	return 0 ;
-
-    printf("SDcart OK\n") ;
-    return 1 ;
-}
-
 
 
 void putchar0(uint8_t c)
@@ -409,15 +392,6 @@ void putchar0(uint8_t c)
 	  //USART_ClearFlag(USART1,USART_FLAG_TC);
 	while(USART_GetFlagStatus(USART1, USART_FLAG_TC) == RESET);
 	USART_SendData(USART1, c);
-
-	/*while(!USART_GetFlagStatus(USART1, USART_FLAG_TC)) ;
-	USART_SendData(USART1, 10);
-	while(!USART_GetFlagStatus(USART1, USART_FLAG_TC)) ;
-	USART_SendData(USART1, 13);
-	while(!USART_GetFlagStatus(USART1, USART_FLAG_TC)) ;
-	USART_SendData(USART1, 0);*/
-	//USART_ClearFlag(USART1,USART_FLAG_TC);
-	  //while(!USART_GetFlagStatus(USART1, USART_FLAG_TXE)) ;
 }
 
 
@@ -498,11 +472,11 @@ unsigned int getADC(int ch)
     ADC_RegularChannelConfig(ADC1, ch, 1, ADC_SampleTime_28Cycles5);
     ADC_SoftwareStartConvCmd(ADC1, ENABLE);
 
-    uint32_t cnt = 0;
+    //uint32_t cnt = 0;
 	//ADC_SoftwareStartConvCmd(ADC1, ENABLE) ;
 	//ADC_Cmd(ADC1, ENABLE) ;
 
-	while( ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)==0) ++cnt;
+	while( ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)==0) // //++cnt;
 
 	return ADC_GetConversionValue(ADC1)&0x0fff;
 }
@@ -526,8 +500,8 @@ int main(void)
 	Delay_Init();
 	USART_Printf_Init(UART_BOUDRATE);
 	USART_Getch_Init(UART_BOUDRATE) ;
-	printf("SystemClk:%d\n",SystemCoreClock);
-	printf( "ChipID:%08x\n\r\n", DBGMCU_GetCHIPID() );
+	//printf("SystemClk:%d\n",SystemCoreClock);
+	//printf( "ChipID:%08x\n\r\n", DBGMCU_GetCHIPID() );
 
 	ADC_initialization() ;
 	DAC_sound_init() ;
@@ -536,24 +510,27 @@ int main(void)
 	//RTC_Reset() ;
 
 	SRAM_init() ;
-	Delay_Ms(10) ;
+	//Delay_Ms(10) ;
 	//printf("External RAM test %d errors\n", SRAM_Test2(4*512));
 
 
 	SysClockRestart() ;
 
-
-	MMC_GPIO_Init();
+	//MMC_GPIO_Init();
     SPI_SDD_Init();
 
     StartWaitUSART() ;
 
-	setup();
+//    ILI9488_begin() ;
 
+	setup();
+	//LCD_fillTriangle(20, 40, 180, 120, 30,100, 0xffff) ;
 	loop();
 
 	while(1)
     {
 	}
+
+	return 0 ;
 }
 

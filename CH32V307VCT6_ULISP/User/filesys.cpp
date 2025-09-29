@@ -39,7 +39,9 @@ void test_filename(char *name) {
   name[0] = '/' ;
 }
 
-
+//const char string_mount_error[17] = "SD mount error\n";
+extern const char *string_mount_error ;
+const char argument_must_be_string[]= "arg. must be string.";
 
 /*(probe-file pathspec)  tests whether a file exists.
 Returns nil if there is no file named pathspec,
@@ -54,7 +56,7 @@ object *fn_probefile (object *args, object *env) {
 
   if (stringp(car(args))) cstring(car(args), pattern_string, 256) ;
   else {
-    error("argument must be string", car(args)); return nil;
+    error(argument_must_be_string, car(args)); return nil;
   }
 
     cstring(car(args), dirname_string, 256) ;
@@ -94,10 +96,10 @@ object *fn_probefile (object *args, object *env) {
   FATFS fatfs;
   FRESULT fres;
   DIR dir ;
-  FILINFO fileinfo ;
+  //FILINFO fileinfo ;
 
   fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK) error2("problem mounting to SD card");
+  if(fres != FR_OK) error2(string_mount_error);
 
   delay(50) ;
 
@@ -141,14 +143,12 @@ Returns true if success and otherwise returns nil.
 object *fn_deletefile (object *args, object *env) {
 #if defined(sdcardsupport)
   (void) env;
-  int type = 0x8 ;  // Files only
-  char pattern_string[256] = "*" ;
-  char dirname_string[256] = "/";
+  char pattern_string[256] ;
   object* obj ;
 
   if (stringp(car(args))) cstring(car(args), pattern_string, 256) ;
   else {
-    error("argument must be string", car(args)); return nil;
+    error(argument_must_be_string, car(args)); return nil;
   }
 
   test_filename(pattern_string) ;
@@ -160,26 +160,17 @@ object *fn_deletefile (object *args, object *env) {
   if(Dir==NULL){  pfstring("problem reading directory from SD card", pserial); return nil; }
 
 #else
-  FIL File;
   FATFS fatfs;
   FRESULT fres;
-  DIR dir ;
-  FILINFO fileinfo ;
 
   fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK) error2("problem mounting to SD card");
+  if(fres != FR_OK) error2(string_mount_error);
 
   delay(50) ;
 
-  fres = f_open(&File, pattern_string, FA_OPEN_EXISTING | FA_READ);
-  if(fres == FR_OK)
-  {
-	  f_close(&File);
 	  fres = f_unlink (pattern_string);
 	  if(fres == FR_OK) obj = tee ;
 	  else obj = nil ;
-  }
-  else obj = tee ;
 
 #endif
 
@@ -187,7 +178,7 @@ object *fn_deletefile (object *args, object *env) {
 #ifdef LINUX_X64
   closedir(Dir);
 #else
-  f_closedir (&dir);
+
   fres =  f_unmount("");
 
 #endif
@@ -209,14 +200,11 @@ Returns true if success and otherwise returns nil.
 object *fn_deletedir (object *args, object *env) {
 #if defined(sdcardsupport)
   (void) env;
-  object *obj ;
-    int type = 0x4 ;  // Directories only
-    char pattern_string[256] = "*" ;
-    char dirname_string[256] = "/";
+    char pattern_string[256] ;
 
     if (stringp(car(args))) cstring(car(args), pattern_string, 256) ;
     else {
-      error("argument must be string", car(args)); return nil;
+      error(argument_must_be_string, car(args)); return nil;
     }
 
     test_filename(pattern_string) ;
@@ -228,28 +216,22 @@ object *fn_deletedir (object *args, object *env) {
     if(Dir==NULL){  pfstring("problem reading directory from SD card", pserial); return nil; }
 
   #else
-    FIL File;
+    //FIL File;
     FATFS fatfs;
     FRESULT fres;
-    DIR dir ;
-    FILINFO fileinfo ;
 
     fres = f_mount(&fatfs, "", 1);
-    if(fres != FR_OK) error2("problem mounting to SD card");
+    if(fres != FR_OK) error2(string_mount_error);
 
     delay(50) ;
 
-    fres = f_opendir(&dir, pattern_string);
-    if(fres == FR_OK)
-    {
-  	  f_closedir(&dir);
   	  fres = f_unlink(pattern_string);
   	  if(fres != FR_OK)
   	  {
   	  	fres =  f_unmount("");
    	  	return nil ;
   	  }
-    }
+
 
 
   #endif
@@ -258,7 +240,7 @@ object *fn_deletedir (object *args, object *env) {
   #ifdef LINUX_X64
     closedir(Dir);
   #else
-    f_closedir (&dir);
+
     fres =  f_unmount("");
 
   #endif
@@ -290,12 +272,12 @@ object *fn_renamefile (object *args, object *env) {
   char newname_string[256] ;
 
   if(stringp(car(args))) cstring(car(args), filename_string, 256) ;
-  else  {  error("first argument must be string.", car(args)); return nil; }
+  else  {  error(argument_must_be_string, car(args)); return nil; }
 
   args = cdr(args);
   if(stringp(car(args)))
         cstring(car(args), newname_string, 256) ;
-  else  {  error("second argument must be string.", car(args)); return nil; }
+  else  {  error(argument_must_be_string, car(args)); return nil; }
 
   test_filename(filename_string) ;
   test_filename(newname_string) ;
@@ -308,21 +290,20 @@ object *fn_renamefile (object *args, object *env) {
         return tee ;
 
 #else
-  FIL File;
+
   FATFS fatfs;
   FRESULT fres;
-  DIR dir ;
-  FILINFO fileinfo ;
+
   object* obj ;
 
   fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK) error2("problem mounting to SD card");
+  if(fres != FR_OK) error2(string_mount_error);
 
   delay(50) ;
 
 
   fres = f_rename (filename_string, newname_string);
-  if(fres != FR_OK){  pfstring("Cannot open directory", pserial); obj = nil ; }
+  if(fres != FR_OK){  pfstring("Cannot rename file", pserial); obj = nil ; }
   else
 	  obj = tee ;
 
@@ -332,7 +313,7 @@ object *fn_renamefile (object *args, object *env) {
 #ifdef LINUX_X64
   closedir(Dir);
 #else
-  f_closedir (&dir);
+
   fres =  f_unmount("");
 
 #endif
@@ -360,12 +341,12 @@ object *fn_copyfile (object *args, object *env) {
   char newname_string[256] ;
 
   if(stringp(car(args))) cstring(car(args), filename_string, 256) ;
-  else  {  pfstring("\ncopy-file: First argument must be string.", pserial); return nil; }
+  else  {  pfstring(argument_must_be_string, pserial); return nil; }
 
   args = cdr(args);
   if(stringp(car(args)))
         cstring(car(args), newname_string, 256) ;
-  else  {  pfstring("\ncopy-file: Second argument must be string.", pserial); return nil; }
+  else  {  pfstring(argument_must_be_string, pserial); return nil; }
 
   test_filename(filename_string) ;
   test_filename(newname_string) ;
@@ -392,7 +373,7 @@ object *fn_copyfile (object *args, object *env) {
   FRESULT fres;
 
   fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK) error2("problem mounting to SD card");
+  if(fres != FR_OK) error2(string_mount_error);
 
   delay(50) ;
 
@@ -447,14 +428,14 @@ object *fn_copyfile (object *args, object *env) {
 directories actually exist, and attempts to create them if they do not.
 Returns true if success and otherwise returns nil.
 */
-object *fn_ensuredirectoriesexist(object *args, object *env) {
+object *fn_ensuredir(object *args, object *env) {
 #if defined(sdcardsupport)
   (void) env;
   char dirname_string[256] = "/";
 
   if(stringp(car(args))) cstring(car(args), dirname_string, 256) ;
   else  {
-      error("\nError: argument must be string", car(args));
+      error(argument_must_be_string, car(args));
       return nil;
   }
 
@@ -480,18 +461,14 @@ object *fn_ensuredirectoriesexist(object *args, object *env) {
   FRESULT fres;
 
   fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK) error2("problem mounting to SD card");
+  if(fres != FR_OK) return nil ;//error2(string_mount_error);
 
   fres = f_mkdir (dirname_string);
   if(fres != FR_OK){
 	  fres =  f_unmount("");
 	  return nil ;
   }
-  else
-  {
-	  fres =  f_unmount("");
-	  return tee ;
-  }
+
 #endif
 
 
@@ -501,7 +478,8 @@ object *fn_ensuredirectoriesexist(object *args, object *env) {
   fres =  f_unmount("");
 #endif
 
-  return nil;
+  return tee;
+
 #else
   (void) args, (void) env;
   error2("not supported");
@@ -517,7 +495,7 @@ object *fn_uiopchdir(object *args, object *env) {
 
   if(stringp(car(args))) cstring(car(args), dirname_string, 256) ;
   else  {
-      error("\nError: argument must be string", car(args));
+      error(argument_must_be_string, car(args));
       return nil;
   }
 

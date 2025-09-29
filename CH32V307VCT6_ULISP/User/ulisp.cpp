@@ -55,17 +55,17 @@ buildstring  - changed for x86 machines
 #include "ch32v30x_usart.h"
 
 #include "board_pins.h"
+#include "ILI9488.h"
+#include "XPT2046.h"
 
 
 // Lisp Library
-const char LispLibrary[] = R"lisplibrary(",
-"(defun rgb (r g b)
- (logior (ash (logand r #xf8) 8) (ash (logand g #xfc) 3) (ash b -3)))",
-
-"(defun load-program (filename)
- (with-sd-card (s filename) (read s)))",
-
+const char LispLibrary[] = R"lisplibrary("
+"(ignore-errors (with-sd-card (s "BOOT.L") (eval (read s))))",
 ")lisplibrary";
+
+//"(defun load-program (filename)
+// (with-sd-card (s filename) (read s)))",
 
 //"(defvar list_editor (load-program "list_editor.l"))",
 //"(eval list_editor)"
@@ -79,17 +79,6 @@ const char LispLibrary[] = R"lisplibrary(",
 
 // (quit)
 
-// Compile options
-
-// #define resetautorun
-// #define printgcs
-//#define sdcardsupport
-// #define gfxsupport
-//#define lisplibrary
-// #define lineeditor
-// #define vt100
-
-//#define extensions
 
 // Includes
 
@@ -152,6 +141,11 @@ char LastChar = 0;
 char LastPrint = 0;
 void* StackBottom;
 
+const char string_mount_error0[17] = "SD mount error\n";
+const char string_not_supported[] = "not_supported" ;
+
+const char *string_mount_error = (char*)string_mount_error0 ;
+
 // Flags
 volatile flags_t Flags = 1<<PRINTREADABLY; // Set by default
 
@@ -164,14 +158,6 @@ void pfstring (const char *s, pfun_t pfun);
 int modbacktrace (int n) {
   return (n+BACKTRACESIZE) % BACKTRACESIZE;
 }
-
-
-
-
-
-
-int iQuit = 0 ;
-
 
 
 
@@ -729,47 +715,35 @@ unsigned int saveimage (object *arg) {
   uint64_t imagesize = compactimage(&arg);
   FIL File;
   FATFS fatfs;
-  UINT uint_result;
+  //UINT uint_result;
   FRESULT fres;
 
-  printf("Save image %d bytes\n");
+  //printf("Save image %d bytes\n");
+    char buffer[BUFFERSIZE];
 
   if (stringp(arg))
   {
-    char buffer[BUFFERSIZE];
-    fres = f_mount(&fatfs, "", 1);
-    if(fres != FR_OK)
-    {
-        error2("problem mounting to SD card");
-        return -1 ;
-    }
-    delay(50) ;
-
-    fres = f_open(&File, MakeFilename(arg, buffer),  FA_CREATE_ALWAYS | FA_WRITE );
-    if(fres != FR_OK)
-    {
-        error2("problem saving to SD card or invalid filename");
-        return -1 ;
-    }
+	  MakeFilename(arg, buffer) ;
     arg = NULL;
   }
   else if (arg == NULL || listp(arg))
   {
-	fres = f_mount(&fatfs, "", 1);
-	if(fres != FR_OK)
-    {
-        error2("problem mounting to SD card");
-        return -1 ;
-    }
-    delay(50) ;
-
-	fres = f_open(&File, "ULISP.IMG",  FA_CREATE_ALWAYS | FA_WRITE );
-	if(fres != FR_OK)
-	{
-	    error2("problem saving to SD card or invalid filename");
-	    return -1 ;
-	}
+	  strcpy(buffer,"ULISP.IMG");
   } else error(invalidarg, arg);
+
+  fres = f_mount(&fatfs, "", 1);
+  if(fres != FR_OK)
+  {
+      error2(string_mount_error);
+      return -1 ;
+  }
+  delay(50) ;
+  fres = f_open(&File, buffer,  FA_CREATE_ALWAYS | FA_WRITE );
+  if(fres != FR_OK)
+  {
+      error2("problem saving to SD card or invalid filename");
+      return -1 ;
+  }
 
   SDWriteInt(&File, (uintptr_t)arg);
 
@@ -796,7 +770,7 @@ unsigned int saveimage (object *arg) {
     }
   }
 #endif
-  printf("OK\n");
+
   fres = f_close(&File);
   if(fres != FR_OK)	return -1 ;
 
@@ -864,25 +838,29 @@ unsigned int loadimage (object *arg) {
   SDBegin();
   FIL File;
   FATFS fatfs;
-  UINT uint_result;
+  //UINT uint_result;
   FRESULT fres;
     //printf("#\n") ;
 
-    fres = f_mount(&fatfs, "", 1);
-    if(fres != FR_OK)	return -1 ;
-    //printf("&\n") ;
-    delay(50);
 
+    char buffer[BUFFERSIZE] ;
 
   if (stringp(arg)) {
-    char buffer[BUFFERSIZE];
-    fres = f_open(&File, MakeFilename(arg, buffer),  FA_OPEN_EXISTING | FA_READ);
-    if(fres != FR_OK) error2("problem loading from SD card or invalid filename");
+	  MakeFilename(arg, buffer) ;
     arg = NULL;
   } else if (arg == NULL) {
-	fres = f_open(&File, "ULISP.IMG",  FA_OPEN_EXISTING | FA_READ);
-	if(fres != FR_OK) error2("problem loading from SD card or invalid filename");
+    strcpy(buffer,"ULISP.IMG");
   } else error(invalidarg, arg);
+
+  fres = f_mount(&fatfs, "", 1);
+  if(fres != FR_OK)	return -1 ;
+  //printf("&\n") ;
+  delay(50);
+
+  fres = f_open(&File, buffer,  FA_OPEN_EXISTING | FA_READ);
+  if(fres != FR_OK) error2("problem loading from SD card or invalid filename");
+
+
   SDReadInt(&File);
 
   // Change for x86
@@ -1001,7 +979,7 @@ void autorunimage () {
   FIL file ;
   FRESULT fres;
   fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK) error2("problem autorunning from SD card");
+  if(fres != FR_OK) error2(string_mount_error);
   fres = f_open(&file, "ULISP.IMG",FA_OPEN_EXISTING | FA_READ);
   if(fres != FR_OK) error2("problem autorunning from SD card");
   object *autorun = (object *)SDReadInt(&file);
@@ -2412,6 +2390,18 @@ object *dobody (object *args, object *env, bool star) {
 #ifdef ARDUINO_ADAFRUIT_QTPY_ESP32S2
 #endif
 
+int spiread () {
+	SPI_I2S_SendData(SPI2,0);
+	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
+	return SPI_I2S_ReceiveData(SPI2) ;
+}
+
+inline void spiwrite (char c) {
+	SPI_I2S_SendData(SPI2,c);
+	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
+}
+
+
 
 
 #ifdef sdcardsupport
@@ -2474,7 +2464,7 @@ gfun_t gstreamfun (object *args) {
   }
   if (streamtype == I2CSTREAM) {
 
-  } else if (streamtype == SPISTREAM) gfun = gserial;
+  } else if (streamtype == SPISTREAM) gfun = spiread;
   else if (streamtype == SERIALSTREAM) {
     if (address == 0) gfun = gserial;
     else if (address == 1) gfun = gserial;
@@ -2492,7 +2482,7 @@ gfun_t gstreamfun (object *args) {
 
 
 #ifdef gfxsupport
-inline void gfxwrite (char c) { /*tcp_write(c);*/ tcp_drawsymbol(c); }
+inline void gfxwrite (char c) { /*tcp_write(c);*/ LCD_drawChar(c); }
 #endif
 
 pfun_t pstreamfun (object *args) {
@@ -2506,7 +2496,9 @@ pfun_t pstreamfun (object *args) {
 
   if (streamtype == I2CSTREAM) {
   }
-  else if (streamtype == SERIALSTREAM) {
+  else
+	  if (streamtype == SPISTREAM) pfun = spiwrite;
+	else   if (streamtype == SERIALSTREAM) {
     if (address == 0) pfun = pserial;
     else if (address == 1) pfun = pserial;
   }
@@ -3252,6 +3244,17 @@ object *sp_withi2c (object *args, object *env) {
     read = (rw != NULL);
   }
   // Top bit of address is I2C port
+  /*TwoWire *port = &Wire;
+  #if defined(ULISP_I2C1)
+  if (address > 127) port = &Wire1;
+  #endif
+  I2Cinit(port, 1); // Pullups
+  object *pair = cons(var, (I2Cstart(port, address & 0x7F, read)) ? stream(I2CSTREAM, address) : nil);
+  push(pair,env);
+  object *forms = cdr(args);
+  object *result = eval(tf_progn(forms,env), env);
+  I2Cstop(port, read);
+  return result;*/
 
   return nil;
 }
@@ -3285,7 +3288,7 @@ object *sp_withsdcard (object *args, object *env) {
 
   FATFS fatfs;
   FIL fil;
-  UINT uint;
+  //UINT uint;
   UINT oflag = FA_OPEN_EXISTING | FA_READ ;
   FRESULT fres;
   //char *cPtr = cProgramBuffer ;
@@ -3344,7 +3347,7 @@ object *sp_withsdcard (object *args, object *env) {
   return result;
   #else
   (void) args, (void) env;
-  error2("not supported");
+  error2(string_not_supported);
   return nil;
   #endif
 }
@@ -4553,37 +4556,83 @@ object *fn_expt (object *args, object *env) {
   (ceiling number [divisor])
   Returns ceil(number/divisor). If omitted, divisor is 1.
 */
-object *fn_ceiling (object *args, object *env) {
+/*object *fn_ceiling (object *args, object *env) {
   (void) env;
   object *arg = first(args);
   args = cdr(args);
   if (args != NULL) return number(ceil(checkintfloat(arg) / checkintfloat(first(args))));
   else return number(ceil(checkintfloat(arg)));
+}*/
+object *fn_ceiling (object *args, object *env) {
+  (void) env;
+  object *arg = first(args);
+  args = cdr(args);
+  if (args != NULL) {
+    object *arg2 = first(args);
+    if (integerp(arg) && integerp(arg2)) {
+      int num = arg->integer, den = arg2->integer, quo = num/den, rem = num-(quo*den);
+      if (((num<0) != (den<0)) || rem==0) return number(quo); else return number(quo+1);
+    } else return number(ceil(checkintfloat(arg) / checkintfloat(first(args))));
+  } else {
+    if (integerp(arg)) return number(arg->integer);
+    else return number(ceil(checkintfloat(arg)));
+  }
 }
+
 
 /*
   (floor number [divisor])
   Returns floor(number/divisor). If omitted, divisor is 1.
 */
-object *fn_floor (object *args, object *env) {
+/*object *fn_floor (object *args, object *env) {
   (void) env;
   object *arg = first(args);
   args = cdr(args);
   if (args != NULL) return number(floor(checkintfloat(arg) / checkintfloat(first(args))));
   else return number(floor(checkintfloat(arg)));
+}*/
+object *fn_floor (object *args, object *env) {
+  (void) env;
+  object *arg = first(args);
+  args = cdr(args);
+  if (args != NULL) {
+    object *arg2 = first(args);
+    if (integerp(arg) && integerp(arg2)) {
+      int num = arg->integer, den = arg2->integer, quo = num/den, rem = num-(quo*den);
+      if (((num<0) == (den<0)) || rem==0) return number(quo); else return number(quo-1);
+    } else return number(floor(checkintfloat(arg) / checkintfloat(first(args))));
+  } else {
+    if (integerp(arg)) return number(arg->integer);
+    else return number(floor(checkintfloat(arg)));
+  }
 }
+
 
 /*
   (truncate number [divisor])
   Returns the integer part of number/divisor. If divisor is omitted it defaults to 1.
 */
-object *fn_truncate (object *args, object *env) {
+/*object *fn_truncate (object *args, object *env) {
   (void) env;
   object *arg = first(args);
   args = cdr(args);
   if (args != NULL) return number((int)(checkintfloat(arg) / checkintfloat(first(args))));
   else return number((int)(checkintfloat(arg)));
+}*/
+object *fn_truncate (object *args, object *env) {
+  (void) env;
+  object *arg = first(args);
+  args = cdr(args);
+  if (args != NULL) {
+    object *arg2 = first(args);
+    if (integerp(arg) && integerp(arg2)) return number(arg->integer / arg2->integer);
+    else return number((int)(checkintfloat(arg) / checkintfloat(first(args))));
+  } else {
+    if (integerp(arg)) return number(arg->integer);
+    else return number((int)(checkintfloat(arg)));
+  }
 }
+
 
 /*
   (round number [divisor])
@@ -4971,7 +5020,7 @@ object *fn_logbitp (object *args, object *env) {
   (void) env;
   int index = checkinteger(first(args));
   int value = checkinteger(second(args));
-  return  nil;
+  return (value&(1<<index) != 0) ? tee : nil;
 }
 
 // System functions
@@ -5363,7 +5412,7 @@ object *fn_analogreadresolution (object *args, object *env) {
   #ifdef ESP32
   analogReadResolution(checkinteger(arg));
   #else
-  error2("not supported");
+  error2(string_not_supported);
   #endif
   return arg;
 }
@@ -5923,7 +5972,7 @@ object *fn_directory (object *args, object *env) {
         if(!(*dirname_string))
            strcpy(dirname_string, "/"); // Dir name "/" restore
      } else {
-       error("argument must be string",car(args));
+       error("Incorrect argument",car(args));
        return nil;
      }
   }
@@ -5942,9 +5991,9 @@ object *fn_directory (object *args, object *env) {
   delay(100);
 
   if(fres != FR_OK)
-  {  pfstring("problem mounting SD card", pserial); return nil; }
+  {  pfstring(string_mount_error, pserial); return nil; }
 
-  printf("Read files %s \n",dirname_string) ;
+  //printf("Read files %s \n",dirname_string) ;
 
   fres = f_opendir(&dir, dirname_string );
   if(fres != FR_OK)
@@ -5958,9 +6007,10 @@ object *fn_directory (object *args, object *env) {
   	if(fno.fname[0] != 0x0)
   	{
   		//printf("Attr = %x\n",fno.fattrib) ;
-  		if( ((fno.fattrib == DEF_TYPE_DIR) && (type&DEF_TYPE_DIR))
-  				|| ((fno.fattrib == DEF_TYPE_FILE) && (type&DEF_TYPE_FILE)) )
-          if(selection((char*)fno.fname, pattern_string ))
+  		//if( ((fno.fattrib == DEF_TYPE_DIR) && (type&DEF_TYPE_DIR))
+  		//		|| ((fno.fattrib == DEF_TYPE_FILE) && (type&DEF_TYPE_FILE)) )
+  		if((fno.fattrib & type) != 0)
+          //if(selection((char*)fno.fname, pattern_string ))
         {
         	  object *filename = lispstring((char*)fno.fname);
         	  cdr(ptr) = cons(filename, NULL);
@@ -5970,16 +6020,16 @@ object *fn_directory (object *args, object *env) {
   }while((fres == FR_OK)&&(fno.fname[0] != 0x0)) ;
 
   fres = f_closedir(&dir);
-  if(fres != FR_OK)	{  pfstring("problem close dir for SD card", pserial); return nil; }
+  if(fres != FR_OK)	{  /*pfstring("problem close dir for SD card", pserial);*/ return nil; }
   fres =  f_unmount("");
-  if(fres != FR_OK)	{  pfstring("problem unmounting SD card", pserial); return nil; }
+  if(fres != FR_OK)	{  /*pfstring("problem unmounting SD card", pserial);*/ return nil; }
 
 
   return (object *)cdr(result);
 #else
 
   (void) args, (void) env;
-  error2("not supported");
+  error2(string_not_supported);
   return nil;
 #endif
 }
@@ -5994,14 +6044,14 @@ object *fn_directory (object *args, object *env) {
 object *sp_withclient (object *args, object *env) {
   object *params = checkarguments(args, 1, 3);
   object *var = first(params);
-  char buffer[BUFFERSIZE];
+  //char buffer[BUFFERSIZE];
   params = cdr(params);
   int n;
   if (params == NULL) {
     //client = server.available();
     //if (!client) return nil;
     n = 2;
-  } else {
+  } /*else {
     object *address = eval(first(params), env);
     object *port = eval(second(params), env);
     int success;
@@ -6010,7 +6060,7 @@ object *sp_withclient (object *args, object *env) {
     //else error2("invalid address");
     if (!success) return nil;
     n = 1;
-  }
+  }*/
   object *pair = cons(var, stream(WIFISTREAM, n));
   push(pair,env);
   object *forms = cdr(args);
@@ -6019,14 +6069,39 @@ object *sp_withclient (object *args, object *env) {
   return result;
 }
 
+
+extern volatile uint8_t uiRecvIndex, uiRecvReadIndex ;
+
 /*
   (available stream)
   Returns the number of bytes available for reading from the wifi-stream, or zero if no bytes are available.
 */
 object *fn_available (object *args, object *env) {
   (void) env;
-  if (isstream(first(args))>>8 != WIFISTREAM) error2("invalid stream");
-  return /*number(client.available())*/ nil;
+  int streamtype = SERIALSTREAM;
+  int address = 0;
+
+  if (args != NULL && first(args) != NULL) {
+    int stream = isstream(first(args));
+    streamtype = stream>>8; address = stream & 0xFF;
+  }
+
+  if (streamtype == WIFISTREAM) return nil;
+  else
+  {
+	if (streamtype == SERIALSTREAM) {
+      if (address == 0)
+      {
+    	  if(uiRecvReadIndex==uiRecvIndex) return nil;
+      }
+	 else
+		error2("invalid stream");
+	}
+	else
+	  error2("invalid stream");
+  }
+
+  return /*number(client.available())*/ tee;
 }
 
 /*
@@ -6123,7 +6198,7 @@ object *sp_withgfx (object *args, object *env) {
   return result;
 #else
   (void) args, (void) env;
-  error2("not supported");
+  error2(string_not_supported);
   return nil;
 #endif
 }
@@ -6137,7 +6212,7 @@ object *fn_drawpixel (object *args, object *env) {
   #ifdef gfxsupport
   uint16_t colour = COLOR_WHITE;
   if (cddr(args) != NULL) colour = checkinteger(third(args));
-  tcp_drawPixel(checkinteger(first(args)), checkinteger(second(args)), colour);
+  ILI9488_drawPixel(checkinteger(first(args)), checkinteger(second(args)), colour);
   #else
   (void) args;
   #endif
@@ -6154,7 +6229,7 @@ object *fn_drawline (object *args, object *env) {
   uint16_t params[4], colour = COLOR_WHITE;
   for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_drawLine(params[0], params[1], params[2], params[3], colour);
+  LCD_DrawLine(params[0], params[1], params[2], params[3], colour);
   #else
   (void) args;
   #endif
@@ -6172,7 +6247,7 @@ object *fn_drawrect (object *args, object *env) {
   uint16_t params[4], colour = COLOR_WHITE;
   for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_drawRect(params[0], params[1], params[2], params[3], colour);
+  ILI9488_drawRect(params[0], params[1], params[2], params[3], colour);
   #else
   (void) args;
   #endif
@@ -6193,7 +6268,7 @@ object *fn_fillrect (object *args, object *env) {
   uint16_t params[4], colour = COLOR_WHITE;
   for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_fillRect(params[0], params[1], params[2], params[3], colour);
+  ILI9488_fillRect(params[0], params[1], params[2], params[3], colour);
   #else
   (void) args;
   #endif
@@ -6211,7 +6286,7 @@ object *fn_drawcircle (object *args, object *env) {
   uint16_t params[3], colour = COLOR_WHITE;
   for (int i=0; i<3; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_drawCircle(params[0], params[1], params[2], colour);
+  LCD_drawCircle(params[0], params[1], params[2], colour);
   #else
   (void) args;
   #endif
@@ -6229,7 +6304,7 @@ object *fn_fillcircle (object *args, object *env) {
   uint16_t params[3], colour = COLOR_WHITE;
   for (int i=0; i<3; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_fillCircle(params[0], params[1], params[2], colour);
+  LCD_fillCircle(params[0], params[1], params[2], colour);
   #else
   (void) args;
   #endif
@@ -6247,7 +6322,7 @@ object *fn_drawroundrect (object *args, object *env) {
   uint16_t params[5], colour = COLOR_WHITE;
   for (int i=0; i<5; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_drawRoundRect(params[0], params[1], params[2], params[3], params[4], colour);
+  LCD_drawRoundRect(params[0], params[1], params[2], params[3], params[4], colour);
   #else
   (void) args;
   #endif
@@ -6265,7 +6340,7 @@ object *fn_fillroundrect (object *args, object *env) {
   uint16_t params[5], colour = COLOR_WHITE;
   for (int i=0; i<5; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_fillRoundRect(params[0], params[1], params[2], params[3], params[4], colour);
+  LCD_fillRoundRect(params[0], params[1], params[2], params[3], params[4], colour);
   #else
   (void) args;
   #endif
@@ -6283,7 +6358,7 @@ object *fn_drawtriangle (object *args, object *env) {
   uint16_t params[6], colour = COLOR_WHITE;
   for (int i=0; i<6; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_drawTriangle(params[0], params[1], params[2], params[3], params[4], params[5], colour);
+  LCD_drawTriangle(params[0], params[1], params[2], params[3], params[4], params[5], colour);
   #else
   (void) args;
   #endif
@@ -6301,7 +6376,7 @@ object *fn_filltriangle (object *args, object *env) {
   uint16_t params[6], colour = COLOR_WHITE;
   for (int i=0; i<6; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  tcp_fillTriangle(params[0], params[1], params[2], params[3], params[4], params[5], colour);
+  LCD_fillTriangle(params[0], params[1], params[2], params[3], params[4], params[5], colour);
   #else
   (void) args;
   #endif
@@ -6325,12 +6400,19 @@ object *fn_drawchar (object *args, object *env) {
     more = cdr(more);
     if (more != NULL) {
       bg = checkinteger(car(more));
+      LCD_settextBkcolor(bg) ;
       more = cdr(more);
       if (more != NULL) size = checkinteger(car(more));
     }
   }
-  tcp_drawChar(checkinteger(first(args)), checkinteger(second(args)), checkchar(third(args)),
-    colour, bg, size);
+
+  /*lcd_drawChar(checkinteger(first(args)), checkinteger(second(args)), checkchar(third(args)),
+    colour, bg, size);*/
+
+  LCD_gotoxy(checkinteger(first(args)), checkinteger(second(args)));
+  LCD_settextcolor(colour);
+  LCD_drawChar(checkchar(third(args)));
+
   #else
   (void) args;
   #endif
@@ -6344,7 +6426,7 @@ object *fn_drawchar (object *args, object *env) {
 object *fn_setcursor (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  tcp_setCursor(checkinteger(first(args)), checkinteger(second(args)));
+  LCD_gotoxy(checkinteger(first(args)), checkinteger(second(args)));
   #else
   (void) args;
   #endif
@@ -6358,8 +6440,16 @@ object *fn_setcursor (object *args, object *env) {
 object *fn_settextcolor (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  if (cdr(args) != NULL) tcp_setRegularTextColors(checkinteger(first(args)), checkinteger(second(args)));
-  else tcp_setTextColor(checkinteger(first(args)));
+  if (cdr(args) != NULL){
+	  LCD_settextcolor(checkinteger(first(args)));
+	  LCD_settextBkcolor( checkinteger(second(args)));
+      LCD_settextBkMode(1) ;
+  }
+  else
+  {
+	  LCD_settextcolor(checkinteger(first(args)));
+	  LCD_settextBkMode(0) ;
+  }
   #else
   (void) args;
   #endif
@@ -6373,7 +6463,7 @@ object *fn_settextcolor (object *args, object *env) {
 object *fn_settextsize (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  tcp_setTextSize(checkinteger(first(args)));
+  LCD_settextmultsize(checkinteger(first(args)));
   #else
   (void) args;
   #endif
@@ -6387,7 +6477,7 @@ object *fn_settextsize (object *args, object *env) {
 object *fn_settextwrap (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  tcp_setTextWrap(first(args) != NULL);
+  LCD_setTextWrap(first(args) != NULL);
   #else
   (void) args;
   #endif
@@ -6404,7 +6494,7 @@ object *fn_fillscreen (object *args, object *env) {
   #ifdef gfxsupport
   uint16_t colour = COLOR_BLACK;
   if (args != NULL) colour = checkinteger(first(args));
-  tcp_fillScreen(colour); //tcp_fillScreen(colour);
+  ILI9488_fillScreen(colour); //tcp_fillScreen(colour);
   #else
   (void) args;
   #endif
@@ -6418,7 +6508,11 @@ object *fn_fillscreen (object *args, object *env) {
 object *fn_setrotation (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  //tcp_setRotation(checkinteger(first(args)));
+  int r = checkinteger(first(args)) ;
+  ILI9488_setRotation(r);
+  #ifdef touchscreen_support
+    TS_setRotation(r) ;
+  #endif
   #else
   (void) args;
   #endif
@@ -6432,7 +6526,7 @@ object *fn_setrotation (object *args, object *env) {
 object *fn_invertdisplay (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  //tcp_invertDisplay(first(args) != NULL);
+  ILI9488_invertDisplay(first(args) != NULL);
   #else
   (void) args;
   #endif
@@ -6734,7 +6828,7 @@ const char doc28[] = "(char string n)\n"
 const char doc29[] = "(string item)\n"
 "Converts its argument to a string.";
 const char doc30[] = "(pinmode pin mode)\n"
-"Sets the input/output mode of an Arduino pin number, and returns nil.\n"
+//"Sets the input/output mode of an Arduino pin number, and returns nil.\n"
 "The mode parameter can be an integer, a keyword, or t or nil.";
 const char doc31[] = "(digitalwrite pin state)\n"
 "Sets the state of the specified Arduino pin number.";
@@ -6742,8 +6836,8 @@ const char doc32[] = "(analogread pin)\n"
 "Reads the specified Arduino analogue pin number and returns the value.";
 const char doc33[] = "(register address [value])\n"
 "Reads or writes the value of a peripheral register.\n"
-"If value is not specified the function returns the value of the register at address.\n"
-"If value is specified the value is written to the register at address and the function returns value.";
+"If value is not specified the function returns the value of the register at address.\n";
+//"If value is specified the value is written to the register at address and the function returns value.";
 const char doc34[] = "(format output controlstring [arguments]*)\n"
 "Outputs its arguments formatted according to the format directives in controlstring.";
 const char doc35[] = "(or item*)\n"
@@ -7137,8 +7231,8 @@ const char doc196[] = "(cls)\n"
 const char doc197[] = "(digitalread pin)\n"
 "Reads the state of the specified Arduino pin number and returns t (high) or nil (low).";
 const char doc198[] = "(analogreadresolution bits)\n"
-"Specifies the resolution for the analogue inputs on platforms that support it.\n"
-"The default resolution on all platforms is 10 bits.";
+"Specifies the resolution for the analogue inputs on platforms that support it.\n";
+//"The default resolution on all platforms is 10 bits.";
 const char doc199[] = "(analogwrite pin value)\n"
 "Writes the value to the specified Arduino pin number.";
 const char doc200[] = "(delay number)\n"
@@ -7146,8 +7240,8 @@ const char doc200[] = "(delay number)\n"
 const char doc201[] = "(millis)\n"
 "Returns the time in milliseconds that uLisp has been running.";
 const char doc202[] = "(sleep secs)\n"
-"Puts the processor into a low-power sleep mode for secs.\n"
-"Only supported on some platforms. On other platforms it does delay(1000*secs).";
+"Puts the processor into a low-power sleep mode for secs.\n";
+//"Only supported on some platforms. On other platforms it does delay(1000*secs).";
 const char doc203[] = "(note [pin] [note] [octave])\n"
 "Generates a square wave on pin.\n"
 "note represents the note in the well-tempered scale.\n"
@@ -7189,8 +7283,8 @@ const char doc218[] = "(available stream)\n"
 const char doc219[] = "(wifi-server)\n"
 "Starts a Wi-Fi server running. It returns nil.";
 const char doc220[] = "(wifi-softap ssid [password channel hidden])\n"
-"Set up a soft access point to establish a Wi-Fi network.\n"
-"Returns the IP address as a string or nil if unsuccessful.";
+"Set up a soft access point to establish a Wi-Fi network.\n";
+//"Returns the IP address as a string or nil if unsuccessful.";
 const char doc221[] = "(connected stream)\n"
 "Returns t or nil to indicate if the client on stream is connected.";
 const char doc222[] = "(wifi-localip)\n"
@@ -7216,12 +7310,12 @@ const char doc229[] = "(draw-circle x y r [colour])\n"
 const char doc230[] = "(fill-circle x y r [colour])\n"
 "Draws a filled circle with its centre at (x, y) and with radius r.\n"
 "The circle is drawn in colour, or white if omitted.";
-const char doc231[] = "(draw-round-rect x y w h radius [colour])\n"
-"Draws an outline rounded rectangle with its top left corner at (x,y), with width w,\n"
-"height h, and corner radius radius. The outline is drawn in colour, or white if omitted.";
-const char doc232[] = "(fill-round-rect x y w h radius [colour])\n"
-"Draws a filled rounded rectangle with its top left corner at (x,y), with width w,\n"
-"height h, and corner radius radius. The outline is drawn in colour, or white if omitted.";
+const char doc231[] = "(draw-round-rect x y width heigth radius [colour])\n";
+//"Draws an outline rounded rectangle with its top left corner at (x,y), with width w,\n"
+//"height h, and corner radius radius. The outline is drawn in colour, or white if omitted.";
+const char doc232[] = "(fill-round-rect x y width heigth radius [colour])\n";
+//"Draws a filled rounded rectangle with its top left corner at (x,y), with width w,\n"
+//"height h, and corner radius radius. The outline is drawn in colour, or white if omitted.";
 const char doc233[] = "(draw-triangle x0 y0 x1 y1 x2 y2 [colour])\n"
 "Draws an outline triangle between (x1,y1), (x2,y2), and (x3,y3).\n"
 "The outline is drawn in colour, or white if omitted.";
@@ -7522,14 +7616,17 @@ const unsigned int *tablesizes[] = { &lookup_table1_size, &lookup_table2_size };
 
 #else
 
-tbl_entry_t *tables[] = {lookup_table, NULL};
-const unsigned int *tablesizes[] = { &lookup_table1_size, 0 };
+const unsigned int lookup_table2_size = 0 ;
+
+const tbl_entry_t *tables[] = {lookup_table, NULL};
+const unsigned int *tablesizes[] = { &lookup_table1_size, &lookup_table2_size };
 
 
 #endif
 
 void init_extensions()
 {
+
 #ifdef extensions
 	tables[1] = lookup_table2_ptr ;
 #endif
@@ -7557,7 +7654,7 @@ builtin_t lookupbuiltin (char* c) {
   for (int n=1; n>=0; n--) {
     int entries = tablesize(n);
     for (int i=0; i<entries; i++) {
-    	char *buf = (char*)(table(n)[i].string);
+    	//char *buf = (char*)(table(n)[i].string);
       if (strcasecmp(c, (char*)(table(n)[i].string)) == 0)
         return (builtin_t)(start + i);
     }
@@ -7652,7 +7749,7 @@ void backtrace (symbol_t name) {
 */
 object *eval (object *form, object *env) {
   bool stackpos;
-  static unsigned long start = 0;
+  //static unsigned long start = 0;
   int TC=0;
   EVAL:
   // Enough space?
@@ -7837,8 +7934,8 @@ void pserial (char c) {
 
   putchar0(c) ;
 
-#ifdef tcp_stdout
-    tcp_drawsymbol((uint16_t )c) ;
+#ifdef gfx_stdout
+  LCD_drawChar((uint16_t )c) ;
 #endif
 }
 
@@ -7859,7 +7956,7 @@ void pcharacter (uint8_t c, pfun_t pfun) {
       const char *p = ControlCodes;
       while (c > 0) {p = p + strlen(p) + 1; c--; }
       pfstring(p, pfun);
-    } else if (c < 127) pfun(c);
+    } else if (c <= 127) pfun(c);
     else pint(c, pfun);
   }
 }
@@ -8484,7 +8581,13 @@ void initenv () {
 void initgfx () {
 
 #ifdef gfxsupport
-    InitTcpGraphics() ;
+	ILI9488_begin() ;
+	#ifdef 	graphics_package
+		//if(LoadFont((char*)"/FONTS/NIN22H14.BIN", 1))
+		{
+		  //SetFont(1) ;
+		}
+	#endif
 #endif
 }
 
@@ -8494,7 +8597,7 @@ void initgfx () {
 void initTouchscreen ()
 {
   #ifdef touchscreen_support
-
+	TS2046_Init() ;
   #endif
 }
 
@@ -8558,7 +8661,7 @@ void DeleteWorkspace()
   repl - the Lisp Read/Evaluate/Print loop
 */
 void repl (object *env) {
-   while (iQuit==0) {
+   while (1) {
     //randomSeed(micros());
     srand (time(NULL));
 
@@ -8635,7 +8738,7 @@ int load_image()
 }
 
 
-void load_file(object *env)
+/*void load_file(object *env)
 {
      unsigned int res = f_open(&SDgfile, file_name, FA_OPEN_EXISTING | FA_READ ) ;
      if(res==FR_OK)
@@ -8653,7 +8756,7 @@ void load_file(object *env)
          execstring("(eval knowleges)", env) ;
          execstring("(eval MainProgram)", env) ;
      }
-}
+}*/
 
 
 
@@ -8691,9 +8794,9 @@ void ulispreset () {
   fp_SDp = NULL ;
   if(fp_SDg) fclose(fp_SDg);
   fp_SDg = NULL ;*/
-  f_unmount( "");
   fres = f_close(&SDgfile);
   fres = f_close(&SDpfile);
+  f_unmount( "");
 #endif
 
 #ifdef lisplibrary
@@ -8701,7 +8804,7 @@ void ulispreset () {
   {
      setflag(LIBRARYLOADED);
      loadfromlibrary(NULL);
-     load_file(NULL) ;
+     //load_file(NULL) ;
 
   }
 #endif
@@ -8740,7 +8843,8 @@ void ulisperror () {
   {
      setflag(LIBRARYLOADED);
      loadfromlibrary(NULL);
-     load_file(NULL) ;
+     pserial('\n');
+     //load_file(NULL) ;
   }
 #endif
 #if defined(ULISP_WIFI)

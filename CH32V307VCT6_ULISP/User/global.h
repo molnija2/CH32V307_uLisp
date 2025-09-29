@@ -138,7 +138,7 @@ char *RxRecvReadPtr ;
 volatile uint8_t uiRecvIndex, uiRecvReadIndex ;
 volatile uint8_t iFlagPackageEnd ;
 volatile uint8_t iPackageLenght ;
-volatile uint32_t uiTimeOutCounter ;
+//volatile uint32_t uiTimeOutCounter ;
 
 
 #else
@@ -149,7 +149,7 @@ extern char *RxRecvReadPtr ;
 extern volatile uint8_t uiRecvIndex, uiRecvReadIndex ;
 extern uint8_t volatile iFlagPackageEnd ;
 extern uint8_t volatile iPackageLenght ;
-extern uint32_t volatile uiTimeOutCounter ;
+//extern uint32_t volatile uiTimeOutCounter ;
 
 #endif
 
@@ -174,11 +174,11 @@ extern uint32_t volatile uiTimeOutCounter ;
 
 
 
-char cOperand1[20],cOperand2[20], cOperand3[20],cOperand4[20] ;
+/*char cOperand1[20],cOperand2[20], cOperand3[20],cOperand4[20] ;
 char  iCmdSymbolCount;
 int32_t iOperand1,iOperand2, iOperand13,iOperand4;
 uint32_t uOperand1,uOperand2, uOperand13,uOperand4;
-
+*/
 
 
 volatile uint16_t work_status;

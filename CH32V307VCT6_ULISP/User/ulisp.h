@@ -21,17 +21,21 @@
 //#define DEF_ARRAY2
 //#define graphics_package
 
+#define filesys_commands
+
 // Compile options
 
 // #define resetautorun
 #define printfreespace
 // #define printgcs
 #define sdcardsupport
-//#define gfxsupport
-//#define touchscreen_support
+#define gfxsupport
+#define graphics_package
+
+#define touchscreen_support
 
 //#define tcp_keyboard
-//#define tcp_stdout
+#define gfx_stdout
 #define lisplibrary
 
 //#define assemblerlist

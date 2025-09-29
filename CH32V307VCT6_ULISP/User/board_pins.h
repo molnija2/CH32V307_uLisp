@@ -28,8 +28,8 @@
 #include "ch32v30x_gpio.h"
 
 typedef struct {
-  GPIO_TypeDef* GPIOx ;
-  uint16_t	iBit;
+  uint8_t	iPort ;
+  uint8_t	iBit;
   uint8_t	iADCChannel;
   uint8_t	iDACChannel;
 } pindesc_t;
