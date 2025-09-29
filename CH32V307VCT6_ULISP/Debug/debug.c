@@ -129,7 +129,7 @@ void USART_Printf_Init(uint32_t baudrate)
 #if(DEBUG == DEBUG_UART1)
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
 
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9;
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_9 | GPIO_Pin_10;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
@@ -159,7 +159,7 @@ void USART_Printf_Init(uint32_t baudrate)
     USART_InitStructure.USART_StopBits = USART_StopBits_1;
     USART_InitStructure.USART_Parity = USART_Parity_No;
     USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-    USART_InitStructure.USART_Mode = USART_Mode_Tx;
+    USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 
 #if(DEBUG == DEBUG_UART1)
     USART_Init(USART1, &USART_InitStructure);
@@ -305,29 +305,24 @@ void USART1_IRQHandler( void )
         *RxRecvPtr ++ = cRecv ;
 
         uiRecvIndex ++ ;
-        iPackageLenght ++ ;
+
         if(uiRecvIndex >= DEF_USART_RX_SIZE)
         {
         	uiRecvIndex = 0 ;
-        	iPackageLenght = 0 ;
         	RxRecvPtr = cRxBuffer ;
         }
 
-        uiTimeOutCounter = 0 ;
     }
-    if( USART_GetFlagStatus( USART1, USART_FLAG_IDLE ) != RESET )
+    /*if( USART_GetFlagStatus( USART1, USART_FLAG_IDLE ) != RESET )
     {
         USART_ClearFlag( USART1, USART_FLAG_IDLE );
-
-        iFlagPackageEnd = 1 ;
         *RxRecvPtr = 0x0 ;
     }
     if( USART_GetFlagStatus( USART1, USART_FLAG_FE ) != RESET )
     {
         USART_ClearFlag( USART1, USART_FLAG_FE );
-        iFlagPackageEnd = 1 ;
         *RxRecvPtr = 0x0 ;
-    }
+    }*/
 }
 
 
