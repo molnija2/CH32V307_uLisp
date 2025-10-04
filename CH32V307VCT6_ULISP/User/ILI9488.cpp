@@ -1433,7 +1433,7 @@ int LCD_drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t radius
 void FillMarkedArea(uint16_t color)
 {
 	for(int y=iFillMinY;y<=iFillMaxY;y++)
-		if((y<ILI9488_TFTHEIGHT)&&(y>=0))
+		if((y<_height)&&(y>=0))
 	{
 	       LCD_Fill_Fast(MinX[y], y, MaxX[y], y+1, color);
 	}
@@ -1500,7 +1500,7 @@ void LCD_DetectLineArea (int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
 
     for (;;){
     	//ILI9488_drawPixel(x0, y0, color);
-    	if((y0<ILI9488_TFTHEIGHT)&&(y0>=0))
+    	if((y0<_height)&&(y0>=0))
     	{
     		if(MinX[y0]>x0) MinX[y0] = x0 ;
     		if(MaxX[y0]<x0) MaxX[y0] = x0 ;
@@ -1535,10 +1535,15 @@ void ClearFillYAreaBorders()
 
 void ClearFillXAreaBorders()
 {
-	int y ;
+	int y, y0 = iFillMinY, y1 = iFillMaxY ;
 
-	for(y=iFillMinY;y<=iFillMaxY;y++)
-		if((y<ILI9488_TFTHEIGHT)&&(y>0))
+	if(y0>y1)
+	{
+		y0 = 0 ;  y1 = _height-1 ;
+	}
+	//for(y=iFillMinY;y<=iFillMaxY;y++)
+	//	if((y<_height)&&(y>0))
+	for(y=y0;y<=y1;y++)
 	{
 			MinX[y] = 30000 ;
 			MaxX[y] = -30000 ;
@@ -1554,10 +1559,11 @@ void TestYArea(int16_t y)
 
 void TestXYAreaPoint(int16_t x, int16_t y)
 {
-	if((y<ILI9488_TFTHEIGHT)&&(y>=0))
+	if((y<_height)&&(y>=0))
 	{
 		if(MinX[y]>x) MinX[y] = x ;
 		if(MaxX[y]<x) MaxX[y] = x ;
+		TestYArea(y);
 	}
 }
 
@@ -1581,6 +1587,24 @@ void LCD_fillTriangle(int16_t x1, int16_t y1, int16_t x2, int16_t y2,
 
 	FillMarkedArea(color) ;
 }
+
+
+
+void LCD_fillPolyInit()
+{
+	ClearFillYAreaBorders() ;
+	ClearFillXAreaBorders() ;
+
+	iFillAreaDetectMode = 1 ;
+}
+
+void LCD_fillPoly(int color)
+{
+	iFillAreaDetectMode = 0 ;
+
+	FillMarkedArea(color) ;
+}
+
 
 
 #include "ff.h"
