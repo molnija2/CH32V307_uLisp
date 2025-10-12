@@ -514,7 +514,7 @@ const tbl_entry_t lookup_table2[]  = {
 #ifdef filesys_commands
     //{ string_probefile, fn_probefile, 0211, /*doc_probefile*/ NULL },
     { string_renamefile, fn_renamefile, 0222, /*doc_renamefile*/ NULL},
-    { string_copyfile, fn_copyfile, 0222, /*doc_copyfile*/NULL },
+    //{ string_copyfile, fn_copyfile, 0222, /*doc_copyfile*/NULL },
     { string_deletefile, fn_deletefile, 0211, /*doc_deletefile*/ NULL },
     { string_ensuredir, fn_ensuredir, 0211, /*doc_ensuredir*/ NULL },
     //{ string_deletedir, fn_deletedir, 0211, doc_deletedir },
