@@ -164,7 +164,9 @@ typedef struct{
   int LoadFont(char *name, uint8_t ifont);
   int SetFont(uint8_t ifont) ;
 
-  void LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h) ;
+  int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *fname) ;
+  int LCD_putRect(int16_t x, int16_t y, char *fname) ;
+
   /*
   uint16_t readcommand16(uint8_t);
   uint32_t readcommand32(uint8_t);

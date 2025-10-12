@@ -299,14 +299,24 @@ object *fn_fillpoly (object *args, object *env) {
 }
 
 
-void LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h) ;
+int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char fname) ;
 
-object *fn_getrect (object *args, object *env) {
+object *fn_saverect (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
   uint16_t params[4];
   for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
-  LCD_getRect(params[0], params[1], params[2], params[3]);
+
+  char pattern_string[128];
+  if (stringp(car(args))) cstring(car(args), pattern_string, 256) ;
+  else {
+    //error(argument_must_be_string, car(args));
+    return nil;
+  }
+
+  if(LCD_getRect(params[0], params[1], params[2], params[3], pattern_string)) return tee;
+
+
   #else
   (void) args;
   #endif
@@ -314,14 +324,22 @@ object *fn_getrect (object *args, object *env) {
 }
 
 
-void LCD_putRect(int16_t x, int16_t y, int16_t w, int16_t h) ;
+int LCD_putRect(int16_t x, int16_t y, char *fname) ;
 
-object *fn_putrect (object *args, object *env) {
+object *fn_loadrect (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  uint16_t params[4];
-  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
-  LCD_putRect(params[0], params[1], params[2], params[3]);
+  uint16_t params[2];
+  for (int i=0; i<2; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  char pattern_string[128];
+  if (stringp(car(args))) cstring(car(args), pattern_string, 256) ;
+  else {
+    //error(argument_must_be_string, car(args));
+    return nil;
+  }
+
+  if(LCD_putRect(params[0], params[1], pattern_string)) return tee;
+
   #else
   (void) args;
   #endif
@@ -369,8 +387,8 @@ const char string_getfontheight[] = "getfontheight" ;
 const char string_getfontwidth[] = "getfontwidth" ;
 const char string_fillpolyinit[] = "fill-init";
 const char string_fillpoly[] = "fill-poly";
-const char string_getrect[] = "get-rect";
-const char string_putrect[] = "put-rect";
+const char string_saverect[] = "save-rect";
+const char string_loadrect[] = "load-rect";
 const char string_getfontinfo[] = "getfontinfo" ;
 
 const char string_gettextwidth[] = "gettextwidth" ;
@@ -473,7 +491,7 @@ const char doc_getscrmaxy[]  = "(getscrmaxy)\n"
 // Symbol lookup table
 const tbl_entry_t lookup_table2[]  = {
 
-    { stringnow, fn_now, 0206, /*docnow*/NULL },
+    { stringnow, fn_now, 0206, docnow },
 
 #ifdef touchscreen_support
     { stringtouch_press, fn_touch_press, 0200, /*doctouch_press*/NULL },
@@ -513,8 +531,8 @@ const tbl_entry_t lookup_table2[]  = {
     { string_getfontwidth, fn_getfontwidth, 0200, /*doc_getfontwidth*/NULL },
 	{string_fillpolyinit, fn_fillpolyinit, 200, NULL},
 	{string_fillpoly, fn_fillpoly, 211, NULL},
-	{string_getrect, fn_getrect, 244, NULL},
-	{string_putrect, fn_putrect, 244, NULL},
+	{string_saverect, fn_saverect, 255, NULL},
+	{string_loadrect, fn_loadrect, 233, NULL},
     { string_getfontinfo, fn_getfontinfo, 0200, /*doc_getfontinfo*/NULL },
     /*{ string_gettextwidth, fn_gettextwidth, 0211, doc_gettextwidth },
 	{ string_getimage, fn_getimage, 0244, doc_getimage },

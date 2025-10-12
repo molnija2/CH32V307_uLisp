@@ -418,7 +418,7 @@ int LCD_Read_Bus()
 {
 	int data ;
 
-	lcd_SET_BUS_OUTPUT();
+	lcd_SET_BUS_INPUT();
 	LCD_CS_Clr();
 	LCD_DC_Set();
     LCD_RD_Clr() ;
@@ -1136,11 +1136,11 @@ void LCD_settextBkMode(uint8_t  mode)
 
 void LCD_drawChar (u8 asciiCode)
 {
-    if(send_data_mode)
+    /*if(send_data_mode)
     {
     	LCD_Writ_Bus(asciiCode) ;
     	return ;
-    }
+    }*/
 
     u8 fontSize = iCurrentCharMultSize ;
     uint16_t color = iCurrentTextColor ;
@@ -1699,16 +1699,90 @@ int SetFont (uint8_t ifont)
 }
 
 
-void LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h)
+int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *name)
 {
 	ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
 	LCD_WR_REG(ILI9488_RAMRD);
+
+	  FIL File;
+	  FATFS fatfs;
+	  UINT uint_result;
+	  FRESULT fres;
+
+
+	  fres = f_mount(&fatfs, "", 1);
+	  if(fres != FR_OK) return -1 ;
+
+	  delay(50);
+
+
+	  fres = f_open(&File, name,  FA_CREATE_ALWAYS | FA_WRITE);
+	  if(fres != FR_OK) return -1 ;
+
+	  f_write(&File, &w, sizeof(int16_t), &uint_result);
+	  f_write(&File, &h, sizeof(int16_t), &uint_result);
+
+	  char buffer[3] ;
+
+	  for(int i=0;i<h*w;i++)
+	  {
+		  buffer[0] = LCD_Read_Bus();
+		  buffer[1] = LCD_Read_Bus();
+		  buffer[2] = LCD_Read_Bus();
+		  f_write(&File, buffer, 3, &uint_result);
+	  }
+
+	  fres = f_close(&File);
+	  //if(fres != FR_OK) return -1 ;
+
+	  fres =  f_unmount("");
+	  //if(fres != FR_OK) return -1 ;
+	  return 1 ;
+
 }
 
-void LCD_putRect(int16_t x, int16_t y, int16_t w, int16_t h)
+int LCD_putRect(int16_t x, int16_t y, char *name)
 {
-	ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
-	send_data_mode = 1 ;
+	int16_t w, h ;
+
+	//send_data_mode = 1 ;
+
+	  FIL File;
+	  FATFS fatfs;
+	  UINT uint_result;
+	  FRESULT fres;
+
+
+	  fres = f_mount(&fatfs, "", 1);
+	  if(fres != FR_OK) return -1 ;
+
+	  delay(50);
+
+
+	  fres = f_open(&File, name,  FA_OPEN_EXISTING | FA_READ);
+	  if(fres != FR_OK) return -1 ;
+
+	  f_read(&File, &w, sizeof(int16_t), &uint_result);
+	  f_read(&File, &h, sizeof(int16_t), &uint_result);
+
+	  ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
+
+	  char buffer[3] ;
+
+	  for(int i=0;i<h*w;i++)
+	  {
+		  f_read(&File, buffer, 3, &uint_result);
+		  LCD_Writ_Bus(buffer[2]);
+		  LCD_Writ_Bus(buffer[1]);
+		  LCD_Writ_Bus(buffer[0]);
+	  }
+
+	  fres = f_close(&File);
+	  //if(fres != FR_OK) return -1 ;
+
+	  fres =  f_unmount("");
+	  //if(fres != FR_OK) return -1 ;
+	  return 1 ;
 }
 
 

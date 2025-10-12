@@ -2422,7 +2422,9 @@ int SDread () {
     return temp;
   }
   char c ;
-  f_read(&SDgfile, &c, 1, &uint_result);
+  fres = f_read(&SDgfile, &c, 1, &uint_result);
+  if(fres != FR_OK) return -1 ;
+  if(uint_result <= 0) return -1 ;
   return 0x0ff & c ;
 }
 
@@ -2494,7 +2496,14 @@ gfun_t gstreamfun (object *args) {
 
 
 #ifdef gfxsupport
-inline void gfxwrite (char c) { /*tcp_write(c);*/ LCD_drawChar(c); }
+
+void LCD_Writ_Bus(uint8_t byte);
+extern u8 send_data_mode ;
+
+inline void gfxwrite (char c) {
+    if(send_data_mode) LCD_Writ_Bus(c) ;
+    else LCD_drawChar(c);
+}
 #endif
 
 pfun_t pstreamfun (object *args) {
@@ -3288,6 +3297,11 @@ object *sp_withspi (object *args, object *env) {
   return nil;
 }
 
+
+
+
+static int iFilesOpenedCounter ;
+
 /*
   (with-sd-card (str filename [mode]) form*)
   Evaluates the forms with str bound to an sd-stream reading from or writing to the file filename.
@@ -3297,6 +3311,7 @@ object *sp_withsdcard (object *args, object *env) {
   #ifdef sdcardsupport
   object *params = checkarguments(args, 2, 3);
   object *var = first(params);
+  int mode = 0;
 
   FATFS fatfs;
   FIL fil;
@@ -3306,8 +3321,11 @@ object *sp_withsdcard (object *args, object *env) {
   //char *cPtr = cProgramBuffer ;
   char fname_complete[256] ;
 
-  fres = f_mount(&fatfs, "", 1);
-  if(fres != FR_OK)	return 0 ;
+  if(iFilesOpenedCounter == 0)
+  {
+	  fres = f_mount(&fatfs, "", 1);
+	  if(fres != FR_OK)	return nil ;
+  }
 
 
   params = cdr(params);
@@ -3318,21 +3336,25 @@ object *sp_withsdcard (object *args, object *env) {
   if (!stringp(filename)) error("filename is not a string", filename);
   params = cdr(params);
   SDBegin();
-  int mode = 0;
+
   if (params != NULL && first(params) != NULL) mode = checkinteger(first(params));
   //const char *oflag = "r";
 
-  if (mode == 1) oflag = FA_OPEN_EXISTING | FA_READ;
-  else if (mode == 2) oflag = FA_CREATE_NEW | FA_WRITE; else if (mode == 3) oflag = FA_OPEN_EXISTING | FA_WRITE;
+  if (mode == 0) oflag = FA_OPEN_EXISTING | FA_READ;
+  else if (mode == 1) oflag = FA_OPEN_APPEND | FA_WRITE;
+  else if (mode == 2) oflag = FA_CREATE_ALWAYS | FA_WRITE;
+  else if (mode == 3) oflag = FA_OPEN_EXISTING | FA_WRITE | FA_READ ;
   if (mode >= 1) {
     char buffer[BUFFERSIZE];
     fres = f_open(&SDpfile, MakeFilename(filename, buffer),oflag) ;
     if (mode == 3) SDgfile = SDpfile ;
     if(fres != FR_OK) error2("problem writing to SD card or invalid filename");
+    iFilesOpenedCounter ++ ;
   } else {
     char buffer[BUFFERSIZE];
     fres = f_open(&SDgfile, MakeFilename(filename, buffer), oflag) ;
     if(fres != FR_OK)  error2("problem reading from SD card or invalid filename");
+    iFilesOpenedCounter ++ ;
   }
   object *pair = cons(var, stream(SDSTREAM, 1));
   push(pair,env);
@@ -3341,17 +3363,19 @@ object *sp_withsdcard (object *args, object *env) {
   if (mode >= 1)
   {
 	    fres = f_close(&SDpfile);
+	    iFilesOpenedCounter -- ;
 	    if(fres != FR_OK) 	return nil ;
-	    fres =  f_unmount("");
+	    if(iFilesOpenedCounter == 0 ) fres =  f_unmount("");
 	    if(fres != FR_OK)  	return nil ;
 
 	    //SDpfile = NULL ;
-      if (mode == 3) SDgfile = SDpfile ;
+      //if (mode == 3) SDgfile = SDpfile ;
   }else
   {
 	    fres = f_close(&SDgfile);
+	    iFilesOpenedCounter -- ;
 	    if(fres != FR_OK) 	return nil ;
-	    fres =  f_unmount("");
+	    if(iFilesOpenedCounter == 0 ) fres =  f_unmount("");
 	    if(fres != FR_OK)  	return nil ;
 
 	    //SDgfile = NULL ;
@@ -8855,6 +8879,7 @@ void ulisperror () {
   fp_SDp = NULL ;
   if(fp_SDg) fclose(fp_SDg);
   fp_SDg = NULL ;*/
+  iFilesOpenedCounter = 0 ;
   f_unmount("");
   fres = f_close(&SDgfile);
   fres = f_close(&SDpfile);
