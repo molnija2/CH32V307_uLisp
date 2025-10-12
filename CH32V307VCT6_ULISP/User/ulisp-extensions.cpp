@@ -252,6 +252,8 @@ object *fn_setfont (object *args, object *env) {
 }
 
 extern FONT_INFO	*FontCurrent ;
+//static FONT_INFO	FontInfo[DEF_FONTS_MAXNUMBER] ;
+
 
 object *fn_gettextwidth (object *args, object *env) {
   (void) env;
@@ -277,6 +279,71 @@ object *fn_getfontwidth (object *args, object *env) {
   return number(w);
 }
 
+object *fn_fillpolyinit (object *args, object *env) {
+  (void) env;
+  void LCD_fillPolyInit();
+
+  LCD_fillPolyInit() ;
+
+  return tee ;
+}
+
+object *fn_fillpoly (object *args, object *env) {
+  (void) env;
+  int icolor = checkinteger(first(args)) ;
+  void LCD_fillPoly(int color);
+
+  LCD_fillPoly(icolor) ;
+
+  return tee ;
+}
+
+
+void LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h) ;
+
+object *fn_getrect (object *args, object *env) {
+  (void) env;
+  #ifdef gfxsupport
+  uint16_t params[4];
+  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  LCD_getRect(params[0], params[1], params[2], params[3]);
+  #else
+  (void) args;
+  #endif
+  return nil;
+}
+
+
+void LCD_putRect(int16_t x, int16_t y, int16_t w, int16_t h) ;
+
+object *fn_putrect (object *args, object *env) {
+  (void) env;
+  #ifdef gfxsupport
+  uint16_t params[4];
+  for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
+  LCD_putRect(params[0], params[1], params[2], params[3]);
+  #else
+  (void) args;
+  #endif
+  return nil;
+}
+
+
+
+object *fn_getfontinfo (object *args, object *env) {
+  (void) env;
+    object *info ;
+
+    if(FontCurrent->DATA)
+    {
+      info = cons(lispstring(FontCurrent->name),cons(number(FontCurrent->Height),cons(number(FontCurrent->Style),nil)));
+
+       return info ;
+    }
+    else
+    	return nil ;
+}
+
 
 
 // Symbol names
@@ -300,10 +367,14 @@ const char string_loadfont[] = "load-font";
 const char string_setfont[] = "set-font";
 const char string_getfontheight[] = "getfontheight" ;
 const char string_getfontwidth[] = "getfontwidth" ;
+const char string_fillpolyinit[] = "fill-init";
+const char string_fillpoly[] = "fill-poly";
+const char string_getrect[] = "get-rect";
+const char string_putrect[] = "put-rect";
+const char string_getfontinfo[] = "getfontinfo" ;
 
 const char string_gettextwidth[] = "gettextwidth" ;
 const char string_setfontname[] = "setfontname" ;
-const char string_getfontinfo[] = "getfontinfo" ;
 const char string_setviewport[] = "setviewport" ;
 const char string_getx[] = "getx" ;
 const char string_gety[] = "gety" ;
@@ -369,9 +440,9 @@ const char doc_setfontname[]  = "(setfontname NAME Height Style)\n"
 "Search and sets the current font with NAME, Height of symbils and Style."
 "Returns t if succesful anr nil otherwise.";
 
-const char doc_getfontinfo[]  = "(getfontinfo Index)\n"
-"Returns information list about the font with Index."
-" The list contains a name, size and stile, of the font.\n";
+const char doc_getfontinfo[]  = "(getfontinfo)\n"
+"Returns information list about current font.";
+//" The list contains a name, size and stile, of the font.\n";
 
 const char doc_setviewport[]  = "(setviewport)\n"
 "Sets current view port rectangle.";
@@ -402,7 +473,7 @@ const char doc_getscrmaxy[]  = "(getscrmaxy)\n"
 // Symbol lookup table
 const tbl_entry_t lookup_table2[]  = {
 
-    { stringnow, fn_now, 0206, docnow },
+    { stringnow, fn_now, 0206, /*docnow*/NULL },
 
 #ifdef touchscreen_support
     { stringtouch_press, fn_touch_press, 0200, /*doctouch_press*/NULL },
@@ -423,9 +494,9 @@ const tbl_entry_t lookup_table2[]  = {
 #endif
 
 #ifdef filesys_commands
-    //{ string_probefile, fn_probefile, 0211, doc_probefile },
+    //{ string_probefile, fn_probefile, 0211, /*doc_probefile*/ NULL },
     { string_renamefile, fn_renamefile, 0222, /*doc_renamefile*/ NULL},
-    //{ string_copyfile, fn_copyfile, 0222, /*doc_copyfile*/NULL },
+    { string_copyfile, fn_copyfile, 0222, /*doc_copyfile*/NULL },
     { string_deletefile, fn_deletefile, 0211, /*doc_deletefile*/ NULL },
     { string_ensuredir, fn_ensuredir, 0211, /*doc_ensuredir*/ NULL },
     //{ string_deletedir, fn_deletedir, 0211, doc_deletedir },
@@ -438,8 +509,13 @@ const tbl_entry_t lookup_table2[]  = {
     { string_kbhit, fn_kbhit, 0200, doc_kbhit },
     { string_loadfont, fn_loadfont, 0222, doc_loadfont },
     { string_setfont, fn_setfont, 0211, doc_setfont },
-    { string_getfontheight, fn_getfontheight, 0200, doc_getfontheight },
-    { string_getfontwidth, fn_getfontwidth, 0200, doc_getfontwidth },
+    { string_getfontheight, fn_getfontheight, 0200, /*doc_getfontheight*/NULL },
+    { string_getfontwidth, fn_getfontwidth, 0200, /*doc_getfontwidth*/NULL },
+	{string_fillpolyinit, fn_fillpolyinit, 200, NULL},
+	{string_fillpoly, fn_fillpoly, 211, NULL},
+	{string_getrect, fn_getrect, 244, NULL},
+	{string_putrect, fn_putrect, 244, NULL},
+    { string_getfontinfo, fn_getfontinfo, 0200, /*doc_getfontinfo*/NULL },
     /*{ string_gettextwidth, fn_gettextwidth, 0211, doc_gettextwidth },
 	{ string_getimage, fn_getimage, 0244, doc_getimage },
     { string_putimage, fn_putimage, 0233, doc_putimage },
@@ -449,7 +525,6 @@ const tbl_entry_t lookup_table2[]  = {
     { string_savebitmap, fn_savebitmap, 0222, doc_savebitmap },
     { string_drawbitmap, fn_drawbitmap, 0233, doc_drawbitmap },
     { string_setfontname, fn_setfontname, 0233, doc_setfontname },
-    { string_getfontinfo, fn_getfontinfo, 0201, doc_getfontinfo },
     { string_setviewport, fn_setviewport, 0244, doc_setviewport },
     { string_getx, fn_getx, 0200, doc_getx },
     { string_gety, fn_gety, 0200, doc_gety },

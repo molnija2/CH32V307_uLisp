@@ -36,6 +36,7 @@
 
 //#define tcp_keyboard
 #define gfx_stdout
+//#define wifi_support
 #define lisplibrary
 
 //#define assemblerlist

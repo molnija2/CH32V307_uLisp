@@ -2454,6 +2454,14 @@ void serialend (int address) {
   else error("port not supported", number(address));
 }
 
+
+int   LCD_Read_Bus() ;
+
+#ifdef gfxsupport
+inline int gfxread () {  return LCD_Read_Bus(); }
+#endif
+
+
 gfun_t gstreamfun (object *args) {
   int streamtype = SERIALSTREAM;
   int address = 0;
@@ -2471,6 +2479,10 @@ gfun_t gstreamfun (object *args) {
   }
   #ifdef sdcardsupport
   else if (streamtype == SDSTREAM) gfun = (gfun_t)SDread;
+  #endif
+  #ifdef gfxsupport
+   else if (streamtype == GFXSTREAM)
+     gfun = (gfun_t)gfxread;
   #endif
   else if (streamtype == WIFISTREAM) gfun = (gfun_t)WiFiread;
   else error2("unknown stream type");
@@ -6182,6 +6194,8 @@ object *fn_wificonnect (object *args, object *env) {
 
 // Graphics functions
 
+
+
 /*
   (with-gfx (str) form*)
   Evaluates the forms with str bound to an gfx-stream so you can print text
@@ -6195,6 +6209,8 @@ object *sp_withgfx (object *args, object *env) {
   push(pair,env);
   object *forms = cdr(args);
   object *result = eval(tf_progn(forms,env), env);
+void LCD_stop_send_data() ;
+  LCD_stop_send_data() ;
   return result;
 #else
   (void) args, (void) env;
@@ -6253,6 +6269,7 @@ object *fn_drawrect (object *args, object *env) {
   #endif
   return nil;
 }
+
 
 
 
@@ -7204,7 +7221,7 @@ const char doc185[] = "(read-byte stream)\n"
 "Reads a byte from a stream and returns it.";
 const char doc186[] = "(read-line [stream])\n"
 "Reads characters from the serial input up to a newline character, and returns them as a string, excluding the newline.\n"
-"If stream is specified the line is read from the specified stream.";
+"If stream is specified the line is\n read from the specified stream.";
 const char doc187[] = "(write-byte number [stream])\n"
 "Writes a byte to a stream.";
 const char doc188[] = "(write-string string [stream])\n"
@@ -7243,9 +7260,9 @@ const char doc202[] = "(sleep secs)\n"
 "Puts the processor into a low-power sleep mode for secs.\n";
 //"Only supported on some platforms. On other platforms it does delay(1000*secs).";
 const char doc203[] = "(note [pin] [note] [octave])\n"
-"Generates a square wave on pin.\n"
-"note represents the note in the well-tempered scale.\n"
-"The argument octave can specify an octave; default 0.";
+"Generates a square wave on pin.\nNot supported.";
+//"note represents the note in the well-tempered scale.\n"
+//"The argument octave can specify an octave; default 0.";
 const char doc204[] = "(edit 'function)\n"
 "Calls the Lisp tree editor to allow you to edit a function definition.";
 const char doc205[] = "(pprint item [str])\n"
@@ -7290,7 +7307,8 @@ const char doc221[] = "(connected stream)\n"
 const char doc222[] = "(wifi-localip)\n"
 "Returns the IP address of the local network as a string.";
 const char doc223[] = "(wifi-connect [ssid pass])\n"
-"Connects to the Wi-Fi network ssid using password pass. It returns the IP address as a string.";
+"Connects to the Wi-Fi network ssid using password pass.";
+//" It returns the IP address as a string.";
 const char doc224[] = "(with-gfx (str) form*)\n"
 "Evaluates the forms with str bound to an gfx-stream so you can print text\n"
 "to the graphics display using the standard uLisp print commands.";
@@ -7300,28 +7318,30 @@ const char doc226[] = "(draw-line x0 y0 x1 y1 [colour])\n"
 "Draws a line from (x0,y0) to (x1,y1) in colour, or white if omitted.";
 const char doc227[] = "(draw-rect x y w h [colour])\n"
 "Draws an outline rectangle with its top left corner at (x,y), with width w,\n"
-"and with height h. The outline is drawn in colour, or white if omitted.";
+"and with height h."; // The outline is drawn in colour, or white if omitted.";
 const char doc228[] = "(fill-rect x y w h [colour])\n"
 "Draws a filled rectangle with its top left corner at (x,y), with width w,\n"
-"and with height h. The outline is drawn in colour, or white if omitted.";
+"and with height h."; //" The outline is drawn in colour, or white if omitted.";
 const char doc229[] = "(draw-circle x y r [colour])\n"
-"Draws an outline circle with its centre at (x, y) and with radius r.\n"
-"The circle is drawn in colour, or white if omitted.";
+"Draws an outline circle with its centre at (x, y) and with radius r.\n";
+//"The circle is drawn in colour, or white if omitted.";
 const char doc230[] = "(fill-circle x y r [colour])\n"
-"Draws a filled circle with its centre at (x, y) and with radius r.\n"
-"The circle is drawn in colour, or white if omitted.";
-const char doc231[] = "(draw-round-rect x y width heigth radius [colour])\n";
+"Draws a filled circle with its centre at (x, y) and with radius r.\n";
+//"The circle is drawn in colour, or white if omitted.";
+const char doc231[] = "(draw-round-rect x y width heigth radius [colour])\n"
+"Draws an outline rounded rectangle";
 //"Draws an outline rounded rectangle with its top left corner at (x,y), with width w,\n"
 //"height h, and corner radius radius. The outline is drawn in colour, or white if omitted.";
-const char doc232[] = "(fill-round-rect x y width heigth radius [colour])\n";
+const char doc232[] = "(fill-round-rect x y width heigth radius [colour])\n"
+"Draws a filled rounded rectangle";
 //"Draws a filled rounded rectangle with its top left corner at (x,y), with width w,\n"
 //"height h, and corner radius radius. The outline is drawn in colour, or white if omitted.";
 const char doc233[] = "(draw-triangle x0 y0 x1 y1 x2 y2 [colour])\n"
-"Draws an outline triangle between (x1,y1), (x2,y2), and (x3,y3).\n"
-"The outline is drawn in colour, or white if omitted.";
+"Draws an outline triangle between (x1,y1), (x2,y2), and (x3,y3).\n";
+//"The outline is drawn in colour, or white if omitted.";
 const char doc234[] = "(fill-triangle x0 y0 x1 y1 x2 y2 [colour])\n"
-"Draws a filled triangle between (x1,y1), (x2,y2), and (x3,y3).\n"
-"The outline is drawn in colour, or white if omitted.";
+"Draws a filled triangle between (x1,y1), (x2,y2), and (x3,y3).\n";
+//"The outline is drawn in colour, or white if omitted.";
 const char doc235[] = "(draw-char x y char [colour background size])\n"
 "Draws the character char with its top left corner at (x,y).\n"
 "The character is drawn in a 5 x 7 pixel font in colour against background,\n"
@@ -7563,11 +7583,13 @@ const tbl_entry_t lookup_table[] = {
   { string216, fn_directory, 0201, doc216 },
   { string217, sp_withclient, 0317, doc217 },
   { string218, fn_available, 0211, doc218 },
+#ifdef wifi_support
   { string219, fn_wifiserver, 0200, doc219 },
   { string220, fn_wifisoftap, 0204, doc220 },
   { string221, fn_connected, 0211, doc221 },
   { string222, fn_wifilocalip, 0200, doc222 },
   { string223, fn_wificonnect, 0203, doc223 },
+#endif
   { string224, sp_withgfx, 0317, doc224 },
   { string225, fn_drawpixel, 0223, doc225 },
   { string226, fn_drawline, 0245, doc226 },

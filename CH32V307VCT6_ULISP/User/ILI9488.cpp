@@ -59,7 +59,7 @@ static FONT_INFO	FontInfo[DEF_FONTS_MAXNUMBER] ;
 
 FONT_INFO	*FontCurrent = FontInfo ;
 
-uint8_t  iFontsNumber ;
+uint8_t  iFontsNumber, send_data_mode ;
 
 uint8_t  tabcolor;
 
@@ -407,16 +407,26 @@ void lcd_SendDataN(const uint8_t *data, int N)
 	LCD_CS_Clr();
 	LCD_DC_Set();
 	for(i=0;i<N;i++) LCD_Writ_Bus(*data++);
-	LCD_DC_Clr();
+	//LCD_DC_Clr();
 	LCD_CS_Set();
 }
 
 
 
 
-uint16_t  LCD_Read_Bus(uint8_t dat)
+int LCD_Read_Bus()
 {
-	return GPIO_ReadInputData(GPIOC) & 0xff;
+	int data ;
+
+	lcd_SET_BUS_OUTPUT();
+	LCD_CS_Clr();
+	LCD_DC_Set();
+    LCD_RD_Clr() ;
+    data = GPIO_ReadInputData(GPIOC) & 0xff;
+    LCD_RD_Set() ;
+	LCD_CS_Set();
+	lcd_SET_BUS_OUTPUT();
+	return data ;
 }
 
 
@@ -484,13 +494,18 @@ void spi_end() {} ;
 #define MADCTL_MH  0x04
 
 
-const uint8_t  gammaP[] ={	0x00,0x03,0x09,0x08,0x16,0x0A,
+static const uint8_t  gammaP[] ={	0x00,0x03,0x09,0x08,0x16,0x0A,
 		0x3F,0x78,0x4C,0x09,0x0A,0x08,0x16,0x1A,0x0F
 };
 
-const uint8_t  gammaN[] ={	0x00,0x16,0x19,0x03,0x0F,0x05,
+static const uint8_t  gammaN[] ={	0x00,0x16,0x19,0x03,0x0F,0x05,
 		0x32,0x45,0x46,0x04,0x0E,0x0D,0x35,0x37,0x0F
 };
+
+/*static const uint8_t gammaP[] = {0x00, 0x05, 0x0A, 0x05, 0x14, 0x08, 0x3F, 0x6F,
+		0x51, 0x07, 0x0B, 0x09, 0x22, 0x29, 0x0F} ;
+static const uint8_t gammaN[] = {0x00, 0x13, 0x16, 0x04, 0x11, 0x07, 0x37, 0x46,
+		0x4D, 0x06, 0x10, 0x0E, 0x35, 0x37, 0x0F} ;*/
 
 
 
@@ -604,7 +619,7 @@ void ILI9488_begin (void)
 
   LCD_BLK_Set();
 
-  ILI9488_setRotation(2) ;
+  ILI9488_setRotation(0) ;
 
 
   iCurrentX = 0 ;
@@ -615,6 +630,7 @@ void ILI9488_begin (void)
   iTextBkMode = 0 ;
 
   iTextWrap = 1 ;
+  send_data_mode = 0 ;
 
   int i ;
   for(i=0; i<DEF_FONTS_MAXNUMBER; i++)  FontInfo[i].DATA = 0 ;
@@ -839,7 +855,7 @@ void ILI9488_drawFastVLine(int16_t x, int16_t y, int16_t h,
   *dcport |=  dcpinmask;
   *csport &= ~cspinmask;
 #else
-  LCD_DC_Set();
+  //LCD_DC_Set();
   LCD_CS_Clr();
 #endif
 
@@ -1010,7 +1026,7 @@ void ILI9488_invertDisplay(boolean i) {
    LCD_DC_Set();
    LCD_CS_Clr();
    //uint8_t r = spiread();
-   uint8_t r = LCD_Read_Bus(0x00);
+   uint8_t r = LCD_Read_Bus();
    LCD_CS_Set();
 
    return r;
@@ -1033,7 +1049,7 @@ uint8_t ILI9488_readcommand8(uint8_t c, uint8_t index) {
 
    LCD_DC_Set();
    //uint8_t r = spiread();
-   uint8_t r = LCD_Read_Bus(0) ;
+   uint8_t r = LCD_Read_Bus() ;
    LCD_CS_Set();
    if (hwSPI) spi_end();
    return r;
@@ -1120,10 +1136,17 @@ void LCD_settextBkMode(uint8_t  mode)
 
 void LCD_drawChar (u8 asciiCode)
 {
+    if(send_data_mode)
+    {
+    	LCD_Writ_Bus(asciiCode) ;
+    	return ;
+    }
+
     u8 fontSize = iCurrentCharMultSize ;
     uint16_t color = iCurrentTextColor ;
 
     u8 charH, charW ;
+
 
     charH = iCurrentCharMultSize*FontCurrent->Height ;
     charW = iCurrentCharMultSize*FontCurrent->Width ;
@@ -1435,7 +1458,7 @@ void FillMarkedArea(uint16_t color)
 	for(int y=iFillMinY;y<=iFillMaxY;y++)
 		if((y<_height)&&(y>=0))
 	{
-	       LCD_Fill_Fast(MinX[y], y, MaxX[y], y+1, color);
+	       LCD_Fill_Fast(MinX[y], y, MaxX[y]+1, y+1, color);
 	}
 }
 
@@ -1535,11 +1558,15 @@ void ClearFillYAreaBorders()
 
 void ClearFillXAreaBorders()
 {
-	int y, y0 = iFillMinY, y1 = iFillMaxY ;
+	int y, y0, y1;
 
-	if(y0>y1)
+	if(iFillMinY>iFillMaxY)
 	{
 		y0 = 0 ;  y1 = _height-1 ;
+	}
+	else
+	{
+		y0 = iFillMinY; y1 = iFillMaxY ;
 	}
 	//for(y=iFillMinY;y<=iFillMaxY;y++)
 	//	if((y<_height)&&(y>0))
@@ -1669,4 +1696,23 @@ int SetFont (uint8_t ifont)
 	FontCurrent = &FontInfo[ifont] ;
 
 	return 1;
+}
+
+
+void LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h)
+{
+	ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
+	LCD_WR_REG(ILI9488_RAMRD);
+}
+
+void LCD_putRect(int16_t x, int16_t y, int16_t w, int16_t h)
+{
+	ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
+	send_data_mode = 1 ;
+}
+
+
+void LCD_stop_send_data()
+{
+	send_data_mode = 0 ;
 }

@@ -33,25 +33,25 @@ const char doc_probefile[] = "(probe-file pathspec)\n"
 
 
 const char doc_deletefile[] = "(delete-file pathspec)\n"
-"delete specified file or directory.\n"
-" Returns true if success and nil otherwise.";
+"delete specified file or directory.\n";
+//" Returns true if success and nil otherwise.";
 
 const char doc_deletedir[] = "(delete-dir pathspec)\n"
-"delete specified directory.\n"
-" Returns true if success and nil otherwise.";
+"delete specified directory.\n";
+//" Returns true if success and nil otherwise.";
 
 const char doc_renamefile[] = "(rename-file filespec newfile)\n"
-"rename or moving specified file.\n"
-" Returns true if success and nil otherwise.";
+"rename or moving specified file.\n";
+//" Returns true if success and nil otherwise.";
 
 const char doc_copyfile[] = "(copy-file filespec newfile)\n"
-"copy specified file.\n"
-" Returns true if success and nil otherwise.";
+"copy specified file.\n";
+//" Returns true if success and nil otherwise.";
 
 const char doc_ensuredir[] = "(ensure-directories-exist pathspec)\n"
 //"Tests whether the directories containing the specified file actually exist,"
-"Create the directory if its not exist.\n"
-" Returns true if success and nil otherwise.";
+"Create the directory if its not exist.\n";
+//" Returns true if success and nil otherwise.";
 
 const char doc_uiopchdir[] = "(uiop:chdir pathspec)\n"
 "Change current directory by specified directory.\n"

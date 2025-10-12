@@ -17,6 +17,7 @@ GPIO_TypeDef* GPIOx[] = {GPIOA,GPIOB, GPIOC, GPIOD, GPIOE };
 #define DEF_GPIOD 	 3
 #define DEF_GPIOE 	 4
 
+enum{ NO_TIMER=0, TIMER1, TIMER2, TIMER3, TIMER4, TIMER5, TIMER6, TIMER7, TIMER8, TIMER9, TIMER10 } ;
 
 const pindesc_t pin_desc[] = {
 		{DEF_GPIOA, 0, REMAP0|0, NOTAVAIL },
