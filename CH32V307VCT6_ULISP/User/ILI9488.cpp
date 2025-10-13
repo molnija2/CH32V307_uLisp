@@ -1657,26 +1657,31 @@ int LoadFont (char *name, uint8_t ifont)
 	  fres = f_open(&File, name,  FA_OPEN_EXISTING | FA_READ);
 	  if(fres != FR_OK) return -1 ;
 
-
-	  f_read(&File, Font, sizeof(FONT_INFO), &uint_result);
-
-	  //printf("Load Font '%s' \n", Font->name) ;
-	  int size = Font->Height*256 * sizeof(uint16_t);
-
 	  if(Font->DATA!=0)
 	  {
 		  free(Font->DATA) ;
 		  iFontsNumber -- ;
 	  }
 
+	  f_read(&File, Font, sizeof(FONT_INFO), &uint_result);
+
+	  //printf("Load Font '%s' index=%d\n", Font->name, ifont) ;
+	  int size = Font->Height*256 * sizeof(uint16_t);
+
+
 	  Font->DATA = 0 ;
 	  Font->DATA = (uint8_t*)(malloc(size)) ;
 
+	  //int avail = avail();
+
 	  if(Font->DATA)
 	  {
+		  iFontsNumber ++ ;
 		  res = 1 ;
 		  f_read(&File, (uint8_t*)(Font->DATA), size, &uint_result);
 	  }
+	  else
+		  res = -1 ;
 
 	  fres = f_close(&File);
 	  //if(fres != FR_OK) return -1 ;
@@ -1684,7 +1689,6 @@ int LoadFont (char *name, uint8_t ifont)
 	  fres =  f_unmount("");
 	  //if(fres != FR_OK) return -1 ;
 
-	  iFontsNumber ++ ;
 	  return res ;
 }
 

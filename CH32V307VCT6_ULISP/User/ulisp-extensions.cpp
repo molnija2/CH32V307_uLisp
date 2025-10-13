@@ -221,12 +221,12 @@ object *fn_loadfont (object *args, object *env) {
   if(stringp(second(args)))
   {
 	  char buffer[256] ;
-	  if(LoadFont(cstring(second(args), buffer, 256), iFont)) return tee ;
+	  if(LoadFont(cstring(second(args), buffer, 256), iFont)==1) return tee ;
 	  else
-		  pfstring("Error loading font", pserial);
+		  pfstring("Error loading font.\n", pserial);
   }
   else
-	  pfstring("Incorrect arguments", pserial);
+	  pfstring("Incorrect arguments.\n", pserial);
 
   #else
   (void) args;
@@ -243,7 +243,7 @@ object *fn_setfont (object *args, object *env) {
   //printf("setfont %d\n", iFont) ;
   if(SetFont(iFont)) return tee ;
 	else
-		  pfstring("Empty font", pserial);
+		  pfstring("Empty font.\n", pserial);
 
   #else
   (void) args;
