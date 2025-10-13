@@ -45,7 +45,7 @@
 #define FONT_STYLE_BOLD			2
 #define FONT_STYLE_BOLD_ITALIC	3
 
-#define DEF_FONTS_MAXNUMBER		50
+#define DEF_FONTS_MAXNUMBER		8
 
 static int16_t iCurrentX, iCurrentY ;
 static u8 iCurrentCharMultSize, iTextBkMode ;
