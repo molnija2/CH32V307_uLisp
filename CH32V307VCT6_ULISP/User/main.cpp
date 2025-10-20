@@ -18,6 +18,8 @@
 
 */
 
+#include "string.h"
+
 #include "debug.h"
 
 #include "global.h"
@@ -38,6 +40,22 @@
 
 /* Global define */
 #define Bank1_SRAM1_ADDR    ((u32)(0x60000000))
+
+#define DEF_ExternalRAM_SIZE	(524288)
+#define DEF_LISP_WORKSPACE_SIZE	(DEF_ExternalRAM_SIZE/2)
+
+#define DEF_ALLOCMEM_ADDR	((u32)(Bank1_SRAM1_ADDR+DEF_LISP_WORKSPACE_SIZE))
+#define DEF_ALLOCMEM__SIZE	((u32)(DEF_LISP_WORKSPACE_SIZE))
+
+
+typedef struct{
+	uintptr_t NextBlock ;
+	uint32_t size ;
+	int32_t	 available ;
+	//int32_t  reserved ;
+} MEMBLOCK_INFO;
+
+
 
 
 
@@ -138,9 +156,9 @@ void SRAM_init()
 	FSMC_NORSRAMInitStruct.FSMC_WriteTimingStruct = &FSMC_ReadWriteTimingStruct ;
 
 	FSMC_ReadWriteTimingStruct.FSMC_AccessMode = FSMC_AccessMode_A ;
-	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 2 ; //14;//14 ; //14 ; //11
+	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 3 ; //14;//14 ; //14 ; //11
 	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 2 ; //10;//7 ; //14 ; //10
-	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 8 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
+	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 7 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
 	FSMC_ReadWriteTimingStruct.FSMC_BusTurnAroundDuration = 0 ;
 
 
@@ -476,11 +494,107 @@ unsigned int getADC(int ch)
 	//ADC_SoftwareStartConvCmd(ADC1, ENABLE) ;
 	//ADC_Cmd(ADC1, ENABLE) ;
 
-	while( ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)==0) // //++cnt;
+	while( ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)==0) ;// //++cnt;
 
 	return ADC_GetConversionValue(ADC1)&0x0fff;
 }
 
+
+
+
+
+void init_RAM_alloc()
+{
+	MEMBLOCK_INFO* meminfo = (MEMBLOCK_INFO*)( DEF_ALLOCMEM_ADDR ) ;
+
+	meminfo->size = 0x40000 ;
+	meminfo->size -= sizeof(MEMBLOCK_INFO) ;
+	meminfo->available = 1 ;
+	meminfo->NextBlock = NULL ;
+}
+
+
+
+#define WORDALIGNED __attribute__((aligned (4)))
+
+char *allocmem(int size)
+{
+	char *res WORDALIGNED ;
+	int size1 = (size>>2)<<2 ;
+	if(size > size1) size = size1 + 4 ;
+
+	//size = ((size>>2)+1)<<2 ;
+
+
+	MEMBLOCK_INFO *meminfo WORDALIGNED = (MEMBLOCK_INFO*)( DEF_ALLOCMEM_ADDR ) ;
+
+
+	while(((meminfo->available!=1)||(meminfo->size<size))
+			&&((MEMBLOCK_INFO*)(meminfo->NextBlock)!=NULL))
+	{
+		meminfo = (MEMBLOCK_INFO*)meminfo->NextBlock ;
+	}
+
+	if(meminfo->available == 0) return NULL ;
+
+	res = (char*)(meminfo) + sizeof(MEMBLOCK_INFO) ;
+
+	if(meminfo->size>=(size+sizeof(MEMBLOCK_INFO)))
+	{
+		MEMBLOCK_INFO *meminfo_new = (MEMBLOCK_INFO*)(res + sizeof(MEMBLOCK_INFO) + size) ;
+		meminfo_new->size = meminfo->size - sizeof(MEMBLOCK_INFO) - size ;
+		meminfo_new->NextBlock = meminfo->NextBlock ;
+		meminfo_new->available = 1 ;
+		meminfo->size = size ;
+		meminfo->available = 0 ;
+		meminfo->NextBlock = (uintptr_t )(meminfo_new) ;
+	}
+	else
+	{
+		meminfo->available = 0 ;
+	}
+	return res ;
+}
+
+void freemem(uintptr_t addr)
+{
+	MEMBLOCK_INFO *meminfo WORDALIGNED = (MEMBLOCK_INFO*)( DEF_ALLOCMEM_ADDR ) ;
+
+	uintptr_t  addr_search = addr - sizeof(MEMBLOCK_INFO) ;
+
+	while((((uintptr_t )meminfo) < addr_search)
+			&&((MEMBLOCK_INFO*)(meminfo->NextBlock)!=NULL))
+	{
+		meminfo = (MEMBLOCK_INFO*)(meminfo->NextBlock) ;
+	}
+
+	if((uintptr_t )meminfo == addr_search)
+	{
+		meminfo->available = 1 ;
+
+		MEMBLOCK_INFO *meminfo_next = meminfo ;
+		u8 stop = 0 ;
+
+		do{
+			meminfo_next = (MEMBLOCK_INFO*)(meminfo_next->NextBlock) ;
+			if(meminfo_next!=NULL)
+			{
+				if(meminfo_next->available == 1 )
+				{
+					meminfo->NextBlock = meminfo_next->NextBlock ;
+					meminfo->size = meminfo->NextBlock - (uintptr_t )meminfo - sizeof(MEMBLOCK_INFO) ;
+				}
+				else
+				{
+					stop = 1 ;
+				}
+			}
+			else
+				stop = 1 ;
+
+		}while(stop == 0) ;
+	}
+}
 
 
 #define UART_BOUDRATE		115200
@@ -510,8 +624,20 @@ int main(void)
 	//RTC_Reset() ;
 
 	SRAM_init() ;
-	//Delay_Ms(10) ;
+	Delay_Ms(10) ;
 	//printf("External RAM test %d errors\n", SRAM_Test2(4*512));
+
+	init_RAM_alloc() ;
+
+	/*char *dynamic_buffer = allocmem(128) ;
+
+	printf("alloc = %08x\n\r",dynamic_buffer) ;
+
+	strcpy(dynamic_buffer, "0123456789qweasdzxcpoilkjmnb\n\r") ;
+	printf("%s",dynamic_buffer) ;
+
+	freemem((uintptr_t)dynamic_buffer);*/
+
 
 
 	SysClockRestart() ;
@@ -524,7 +650,6 @@ int main(void)
 //    ILI9488_begin() ;
 
 	setup();
-	//LCD_fillTriangle(20, 40, 180, 120, 30,100, 0xffff) ;
 	loop();
 
 	while(1)

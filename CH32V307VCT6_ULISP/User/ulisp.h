@@ -13,7 +13,8 @@
 
 #ifdef BOARD_HAS_ExternalRAM
 #define Bank1_SRAM1_ADDR    ((u32)(0x60000000))
-#define DEF_ExternalRAM_SIZE	524288
+#define DEF_ExternalRAM_SIZE	(524288)
+#define DEF_ExternalRAM_WORKSPACE_SIZE	(DEF_ExternalRAM_SIZE/2)
 #endif
 
 
@@ -52,7 +53,7 @@
 #define WORKSPACESIZE (4096*16)                  /* Objects (8*bytes) */
 #else
 	#ifdef BOARD_HAS_ExternalRAM
-	#define WORKSPACESIZE  (4096*16)
+	#define WORKSPACESIZE  (u32)(DEF_ExternalRAM_WORKSPACE_SIZE/8)
 	#else
 	#define WORKSPACESIZE (4096/2)
 	#endif

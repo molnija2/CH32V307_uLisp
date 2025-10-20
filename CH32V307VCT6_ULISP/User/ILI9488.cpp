@@ -1155,7 +1155,7 @@ void LCD_drawChar (u8 asciiCode)
     	if((iCurrentX+charW)>=_width)
     {
     	iCurrentX = 0 ;
-    	iCurrentY += charH + /*(charH>>2)*/ 2 ;
+    	iCurrentY += charH + /*(charH>>2)*/ 0 ;
     	if((iCurrentY+charH)>=_height)
     	{
     		iCurrentY = 0 ;
@@ -1166,7 +1166,7 @@ void LCD_drawChar (u8 asciiCode)
     if(asciiCode=='\n')
     {
     	iCurrentX = 0 ;
-    	iCurrentY += charH + /*(charH>>2)*/ 2 ;
+    	iCurrentY += charH + /*(charH>>2)*/ 0 ;
     	if((iCurrentY+charH)>=_height)
     	{
     		iCurrentY = 0 ;
@@ -1198,7 +1198,11 @@ void LCD_drawChar (u8 asciiCode)
               if(FontCurrent == FontInfo)
            	    fontData = *(FontCurrent->DATA+asciiCode*FontCurrent->Width+xI);
               else
-                fontData = ((uint16_t*)(FontCurrent->DATA))[asciiCode*FontCurrent->Width+xI];
+              {
+            	  int i = asciiCode*FontCurrent->Width+xI ;
+            	  fontData = ((uint32_t*)(FontCurrent->DATA))[i>>1];
+            	  if(i&0x1) fontData >>=16 ;
+              }
 
         	  if ((fontData&ibit)!=0)
         	  {
@@ -1220,7 +1224,10 @@ void LCD_drawChar (u8 asciiCode)
        	fontData = *(FontCurrent->DATA+asciiCode*FontCurrent->Height+yI);
       else
       {
-         	fontData = ((uint16_t*)(FontCurrent->DATA))[asciiCode*FontCurrent->Height+yI];
+    	  int i = asciiCode*FontCurrent->Height+yI ;
+
+         	fontData = ((uint32_t*)(FontCurrent->DATA))[i>>1];
+         	if(i&0x1) fontData >>=16 ;
          	ibit = 0x8000;
       }
       for (int  xI=0; xI<FontCurrent->Width; xI++){
@@ -1647,6 +1654,8 @@ int LoadFont (char *name, uint8_t ifont)
 	  UINT uint_result;
 	  FRESULT fres;
 	  uint8_t res = 0 ;
+	  void freemem(uintptr_t addr) ;
+	  char *allocmem(int size) ;
 
 	  fres = f_mount(&fatfs, "", 1);
 	  if(fres != FR_OK) return -1 ;
@@ -1659,7 +1668,8 @@ int LoadFont (char *name, uint8_t ifont)
 
 	  if(Font->DATA!=0)
 	  {
-		  free(Font->DATA) ;
+		  //free(Font->DATA) ;
+		  freemem((uintptr_t)(Font->DATA)) ;
 		  iFontsNumber -- ;
 	  }
 
@@ -1670,7 +1680,8 @@ int LoadFont (char *name, uint8_t ifont)
 
 
 	  Font->DATA = 0 ;
-	  Font->DATA = (uint8_t*)(malloc(size)) ;
+	  //Font->DATA = (uint8_t*)(malloc(size)) ;
+	  Font->DATA = (uint8_t*)(allocmem(size)) ;
 
 	  //int avail = avail();
 
@@ -1678,7 +1689,15 @@ int LoadFont (char *name, uint8_t ifont)
 	  {
 		  iFontsNumber ++ ;
 		  res = 1 ;
-		  f_read(&File, (uint8_t*)(Font->DATA), size, &uint_result);
+		  //f_read(&File, Font->DATA, size, &uint_result);
+		  uint32_t value, *iPtr =  (uint32_t*)(Font->DATA) ;
+
+		  do{
+			  f_read(&File, &value, sizeof(uint32_t), &uint_result);
+			  *iPtr = value ;
+			  size -= sizeof(uint32_t) ;
+			  iPtr ++ ;
+		  } while(size>0) ;
 	  }
 	  else
 		  res = -1 ;

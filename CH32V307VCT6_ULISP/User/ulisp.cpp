@@ -7605,9 +7605,9 @@ const tbl_entry_t lookup_table[] = {
   { string214, sp_ignoreerrors, 0307, doc214 },
   { string215, sp_error, 0317, doc215 },
   { string216, fn_directory, 0201, doc216 },
-  { string217, sp_withclient, 0317, doc217 },
   { string218, fn_available, 0211, doc218 },
 #ifdef wifi_support
+  { string217, sp_withclient, 0317, doc217 },
   { string219, fn_wifiserver, 0200, doc219 },
   { string220, fn_wifisoftap, 0204, doc220 },
   { string221, fn_connected, 0211, doc221 },
