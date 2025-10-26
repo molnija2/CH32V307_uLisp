@@ -41,7 +41,7 @@
 #define lisplibrary
 
 //#define assemblerlist
-//#define lineeditor
+#define lineeditor
 #define vt100
 #define extensions
 
@@ -55,7 +55,7 @@
 	#ifdef BOARD_HAS_ExternalRAM
 	#define WORKSPACESIZE  (u32)(DEF_ExternalRAM_WORKSPACE_SIZE/8)
 	#else
-	#define WORKSPACESIZE (4096/2)
+	#define WORKSPACESIZE (2000)
 	#endif
 #endif
 
@@ -218,7 +218,7 @@ typedef void (*pfun_t)(char);
 
 enum builtins: builtin_t { NIL, TEE, NOTHING, OPTIONAL, FEATURES, INITIALELEMENT, ELEMENTTYPE, TEST, COLONA, COLONB,
 COLONC, BIT, AMPREST, LAMBDA, LET, LETSTAR, CLOSURE, PSTAR, QUOTE, DEFUN, DEFVAR, EQ, CAR, FIRST, CDR,
-REST, NTH, AREF, CHAR, STRINGFN, PINMODE, DIGITALWRITE, ANALOGREAD, REGISTER, FORMAT, 
+REST, NTH, AREF, CHAR, STRINGFN, PINMODE, DIGITALWRITE, ANALOGREAD, REGISTER, FORMAT, DEFCODE,
  };
 
 

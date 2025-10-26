@@ -219,3 +219,12 @@ int pinMode(int pin, int mode)
 
 	return 1 ;
 }
+
+void checkanalogread (int pin) {
+	//if(pin_desc[pin].iADCChannel==NOTAVAIL) return 0 ;
+	//return 1 ;
+}
+
+void checkanalogwrite (int pin) {
+
+}

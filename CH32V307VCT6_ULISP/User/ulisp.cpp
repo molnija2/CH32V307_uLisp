@@ -64,9 +64,9 @@ const char LispLibrary[] = R"lisplibrary("
 "(ignore-errors (with-sd-card (s "BOOT.L") (eval (read s))))",
 ")lisplibrary";
 
-//"(defun load-program (filename)
-// (with-sd-card (s filename) (read s)))",
-
+/*"(defun load-program (filename)
+ (with-sd-card (s filename) (read s)))",
+*/
 //"(defvar list_editor (load-program "list_editor.l"))",
 //"(eval list_editor)"
 
@@ -2446,6 +2446,11 @@ inline int WiFiread () {
   return 0;
 }
 
+void WiFiwrite(char c)
+{
+
+}
+
 void serialbegin (int address, int baud) {
   if (address == 1)  ; //Serial1.begin((long)baud*100);
   else error("port not supported", number(address));
@@ -2482,11 +2487,13 @@ gfun_t gstreamfun (object *args) {
   #ifdef sdcardsupport
   else if (streamtype == SDSTREAM) gfun = (gfun_t)SDread;
   #endif
-  #ifdef gfxsupport
+  /*#ifdef gfxsupport
    else if (streamtype == GFXSTREAM)
      gfun = (gfun_t)gfxread;
-  #endif
+  #endif*/
+#ifdef wifi_support
   else if (streamtype == WIFISTREAM) gfun = (gfun_t)WiFiread;
+#endif
   else error2("unknown stream type");
   return gfun;
 }
@@ -2501,8 +2508,9 @@ void LCD_Writ_Bus(uint8_t byte);
 extern u8 send_data_mode ;
 
 inline void gfxwrite (char c) {
-    if(send_data_mode) LCD_Writ_Bus(c) ;
-    else LCD_drawChar(c);
+    /*if(send_data_mode) LCD_Writ_Bus(c) ;
+    else*/
+    	LCD_drawChar(c);
 }
 #endif
 
@@ -2533,19 +2541,16 @@ pfun_t pstreamfun (object *args) {
   else if (streamtype == GFXSTREAM)
       pfun = (pfun_t)gfxwrite;
   #endif
-  else if (streamtype == WIFISTREAM) pfun = pserial;
+  else if (streamtype == WIFISTREAM) pfun = (pfun_t)WiFiwrite ;//pserial;
   else error2("unknown stream type");
   return pfun;
 }
 
 // Check pins
 
-void checkanalogread (int pin) {
-}
+void checkanalogread (int pin) ;
 
-void checkanalogwrite (int pin) {
-
-}
+void checkanalogwrite (int pin) ;
 
 // Note
 
@@ -3404,6 +3409,213 @@ object *tf_progn (object *args, object *env) {
   }
   return car(args);
 }
+
+
+
+const char stringASM[] = "defcode";
+const char docASM[] = "(defcode name (parameters) form*)\n";
+//"Creates a machine-code function called name from a series of 16-bit integers given in the body of the form.\n";
+//"These are written into RAM, and can be executed by calling the function in the same way as a normal Lisp function.";
+
+// Assembler
+
+#define CODESIZE 512                    /* Bytes */
+
+// Code marker stores start and end of code block
+#define startblock(x)      ((x->integer) & 0xFFFF)
+#define endblock(x)        ((x->integer) >> 16 & 0xFFFF)
+typedef int (*intfn_ptr_type)(int w, int x, int y, int z);
+
+uint8_t MyCode[CODESIZE] WORDALIGNED;
+
+
+object *call (int entry, int nargs, object *args, object *env) {
+#if defined(CODESIZE)
+  (void) env;
+  int param[4];
+  for (int i=0; i<nargs; i++) {
+    object *arg = first(args);
+    if (integerp(arg)) param[i] = arg->integer;
+    else param[i] = (uintptr_t)arg;
+    args = cdr(args);
+  }
+  asm("fence.i");
+  int w = ((intfn_ptr_type)&MyCode[entry])(param[0], param[1], param[2], param[3]);
+  return number(w);
+#else
+  return nil;
+#endif
+}
+
+
+void putcode (object *arg, int origin, int pc) {
+#if defined(CODESIZE)
+  int code = checkinteger(arg);
+  MyCode[origin+pc] = code & 0xff;
+  MyCode[origin+pc+1] = (code>>8) & 0xff;
+  #if defined(assemblerlist)
+  printhex4(pc, pserial);
+  printhex4(code, pserial);
+  #endif
+#endif
+}
+
+int assemble (int pass, int origin, object *entries, object *env, object *pcpair) {
+  int pc = 0; cdr(pcpair) = number(pc);
+  while (entries != NULL) {
+    object *arg = first(entries);
+    if (symbolp(arg)) {
+      if (pass == 2) {
+        #if defined(assemblerlist)
+        printhex4(pc, pserial);
+        indent(5, ' ', pserial);
+        printobject(arg, pserial); pln(pserial);
+        #endif
+      } else {
+        object *pair = findvalue(arg, env);
+        cdr(pair) = number(pc);
+      }
+    } else {
+      object *argval = eval(arg, env);
+      if (listp(argval)) {
+        object *arglist = argval;
+        while (arglist != NULL) {
+          if (pass == 2) {
+            putcode(first(arglist), origin, pc);
+            #if defined(assemblerlist)
+            if (arglist == argval) superprint(arg, 0, pserial);
+            pln(pserial);
+            #endif
+          }
+          pc = pc + 2;
+          cdr(pcpair) = number(pc);
+          arglist = cdr(arglist);
+        }
+      } else if (integerp(argval)) {
+        if (pass == 2) {
+          putcode(argval, origin, pc);
+          #if defined(assemblerlist)
+          superprint(arg, 0, pserial); pln(pserial);
+          #endif
+        }
+        pc = pc + 2;
+        cdr(pcpair) = number(pc);
+      } else error("illegal entry", arg);
+    }
+    entries = cdr(entries);
+  }
+  // Round up to multiple of 4 to give code size
+  if (pc%4 != 0) pc = pc + 4 - pc%4;
+  return pc;
+}
+
+
+
+object *codehead (int entry) {
+  object *ptr = myalloc();
+  ptr->type = CODE;
+  ptr->integer = entry;
+  return ptr;
+}
+
+object *sp_defcode (object *args, object *env) {
+  setflag(NOESC);
+  object *var = first(args);
+  object *params = second(args);
+  if (!symbolp(var)) error("not a symbol", var);
+
+  // Make parameters into synonyms for registers a0, a1, etc
+  int regn = 0;
+  while (params != NULL) {
+    if (regn > 3) error("more than 4 parameters", var);
+    object *regpair = cons(car(params), bsymbol((builtin_t)((toradix40('a')*40+toradix40('0')+regn)*2560000))); // Symbol for a0 etc
+    push(regpair,env);
+    regn++;
+    params = cdr(params);
+  }
+
+  // Make *pc* a local variable
+  object *pcpair = cons(bsymbol(PSTAR), number(0));
+  push(pcpair,env);
+  args = cdr(args);
+
+  // Make labels into local variables
+  object *entries = cdr(args);
+  while (entries != NULL) {
+    object *arg = first(entries);
+    if (symbolp(arg)) {
+      object *pair = cons(arg,number(0));
+      push(pair,env);
+    }
+    entries = cdr(entries);
+  }
+
+  // First pass
+  int origin = 0;
+  int codesize = assemble(1, origin, cdr(args), env, pcpair);
+
+  // See if it will fit
+  object *globals = GlobalEnv;
+  while (globals != NULL) {
+    object *pair = car(globals);
+    if (pair != NULL && car(pair) != var && consp(cdr(pair))) { // Exclude me if I already exist
+      object *codeid = second(pair);
+      if (codeid->type == CODE) {
+        codesize = codesize + endblock(codeid) - startblock(codeid);
+      }
+    }
+    globals = cdr(globals);
+  }
+  if (codesize > CODESIZE) error("not enough room for code", var);
+
+  // Compact the code block, removing gaps
+  origin = 0;
+  object *block;
+  int smallest;
+
+  do {
+    smallest = CODESIZE;
+    globals = GlobalEnv;
+    while (globals != NULL) {
+      object *pair = car(globals);
+      if (pair != NULL && car(pair) != var && consp(cdr(pair))) { // Exclude me if I already exist
+        object *codeid = second(pair);
+        if (codeid->type == CODE) {
+          if (startblock(codeid) < smallest && startblock(codeid) >= origin) {
+            smallest = startblock(codeid);
+            block = codeid;
+          }
+        }
+      }
+      globals = cdr(globals);
+    }
+
+    // Compact fragmentation if necessary
+    if (smallest == origin) origin = endblock(block); // No gap
+    else if (smallest < CODESIZE) { // Slide block down
+      int target = origin;
+      for (int i=startblock(block); i<endblock(block); i++) {
+        MyCode[target] = MyCode[i];
+        target++;
+      }
+      block->integer = target<<16 | origin;
+      origin = target;
+    }
+
+  } while (smallest < CODESIZE);
+
+  // Second pass - origin is first free location
+  codesize = assemble(2, origin, cdr(args), env, pcpair);
+
+  object *val = cons(codehead((origin+codesize)<<16 | origin), args);
+  object *pair = value(var->name, GlobalEnv);
+  if (pair != NULL) cdr(pair) = val;
+  else push(cons(var, val), GlobalEnv);
+  clrflag(NOESC);
+  return var;
+}
+
+
 
 /*
   (if test then [else])
@@ -5432,7 +5644,7 @@ object *fn_analogread (object *args, object *env) {
   if (keywordp(arg)) pin = checkkeyword(arg);
   else {
     pin = checkinteger(arg);
-    checkanalogread(pin);
+    //checkanalogread(pin);
   }
   return number(analogRead(pin));
 }
@@ -5599,7 +5811,9 @@ object *fn_pprintall (object *args, object *env) {
     pln(pfun);
     if (consp(val) && symbolp(car(val)) && builtin(car(val)->name) == LAMBDA) {
       superprint(cons(bsymbol(DEFUN), cons(var, cdr(val))), 0, pfun);
-    } else {
+    } else if (consp(val) && car(val)->type == CODE) {
+        superprint(cons(bsymbol(DEFCODE), cons(var, cdr(val))), 0, pfun);
+      } else {
       superprint(cons(bsymbol(DEFVAR), cons(var, cons(quote(val), NULL))), 0, pfun);
     }
     pln(pfun);
@@ -6122,9 +6336,6 @@ object *fn_available (object *args, object *env) {
     streamtype = stream>>8; address = stream & 0xFF;
   }
 
-  if (streamtype == WIFISTREAM) return nil;
-  else
-  {
 	if (streamtype == SERIALSTREAM) {
       if (address == 0)
       {
@@ -6133,9 +6344,12 @@ object *fn_available (object *args, object *env) {
 	 else
 		error2("invalid stream");
 	}
+
+#ifdef wifi_support
+	if (streamtype == WIFISTREAM) return nil;
 	else
-	  error2("invalid stream");
-  }
+		error2("invalid stream");
+#endif
 
   return /*number(client.available())*/ tee;
 }
@@ -6832,8 +7046,8 @@ const char doc0[] = "nil\n"
 const char doc1[] = "t\n"
 "A symbol representing true.";
 const char doc2[] = "nothing\n"
-"A symbol with no value.\n"
-"It is useful if you want to suppress printing the result of evaluating a function.";
+"A symbol with no value.\n";
+//"It is useful if you want to suppress printing the result of evaluating a function.";
 const char doc3[] = "&optional\n"
 "Can be followed by one or more optional parameters in a lambda or defun parameter list.";
 const char doc4[] = "*features*\n"
@@ -6877,8 +7091,8 @@ const char doc32[] = "(analogread pin)\n"
 "Reads the specified Arduino analogue pin number and returns the value.";
 const char doc33[] = "(register address [value])\n"
 "Reads or writes the value of a peripheral register.\n"
-"If value is not specified the function returns the value of the register at address.\n";
-//"If value is specified the value is written to the register at address and the function returns value.";
+"If value is not specified the function returns the value of the register at address.\n"
+"If value is specified the value is written to the register at address and the function returns value.";
 const char doc34[] = "(format output controlstring [arguments]*)\n"
 "Outputs its arguments formatted according to the format directives in controlstring.";
 const char doc35[] = "(or item*)\n"
@@ -6887,8 +7101,8 @@ const char doc36[] = "(setq symbol value [symbol value]*)\n"
 "For each pair of arguments assigns the value of the second argument\n"
 "to the variable specified in the first argument.";
 const char doc37[] = "(loop forms*)\n"
-"Executes its arguments repeatedly until one of the arguments calls (return),\n"
-"which then causes an exit from the loop.";
+"Executes its arguments repeatedly until one of the arguments calls (return).\n";
+//"which then causes an exit from the loop.";
 const char doc38[] = "(push item place)\n"
 "Modifies the value of place, which should be a list, to add item onto the front of the list,\n"
 "and returns the new list.";
@@ -7196,12 +7410,12 @@ const char doc164[] = "(search pattern target [:test function])\n"
 const char doc165[] = "(read-from-string string)\n"
 "Reads an atom or list from the specified string and returns it.";
 const char doc166[] = "(princ-to-string item)\n"
-"Prints its argument to a string, and returns the string.\n"
-"Characters and strings are printed without quotation marks or escape characters.";
+"Prints its argument to a string, and returns the string.\n";
+//"Characters and strings are printed without quotation marks or escape characters.";
 const char doc167[] = "(prin1-to-string item [stream])\n"
-"Prints its argument to a string, and returns the string.\n"
-"Characters and strings are printed with quotation marks and escape characters,\n"
-"in a format that will be suitable for read-from-string.";
+"Prints its argument to a string or stream with quotation marks and escape, and returns the string.\n";
+//"Characters and strings are printed with quotation marks and escape characters.\n";
+//"in a format that will be suitable for read-from-string.";
 const char doc168[] = "(logand [value*])\n"
 "Returns the bitwise & of the values.";
 const char doc169[] = "(logior [value*])\n"
@@ -7227,31 +7441,34 @@ const char doc178[] = "(makunbound symbol)\n"
 const char doc179[] = "(break)\n"
 "Inserts a breakpoint in the program. When evaluated prints Break! and reenters the REPL.";
 const char doc180[] = "(read [stream])\n"
-"Reads an atom or list from the serial input and returns it.\n"
-"If stream is specified the item is read from the specified stream.";
+"Reads an atom or list from the serial input or stream and returns it.\n";
+//"If stream is specified the item is read from the specified stream.";
 const char doc181[] = "(prin1 item [stream])\n"
 "Prints its argument, and returns its value.\n"
 "Strings are printed with quotation marks and escape characters.";
 const char doc182[] = "(print item [stream])\n"
-"Prints its argument with quotation marks and escape characters, on a new line, and followed by a space.\n"
-"If stream is specified the argument is printed to the specified stream.";
+"Prints its argument with quotation marks and escape characters, on a new line, and followed by a space.\n";
+//"If stream is specified the argument is printed to the specified stream.";
 const char doc183[] = "(princ item [stream])\n"
 "Prints its argument, and returns its value.\n"
 "Characters and strings are printed without quotation marks or escape characters.";
 const char doc184[] = "(terpri [stream])\n"
-"Prints a new line, and returns nil.\n"
-"If stream is specified the new line is written to the specified stream.";
+"Prints a new line to serial or stream, and returns nil.\n";
+//"If stream is specified the new line is written to the specified stream.";
 const char doc185[] = "(read-byte stream)\n"
 "Reads a byte from a stream and returns it.";
 const char doc186[] = "(read-line [stream])\n"
-"Reads characters from the serial input up to a newline character, and returns them as a string, excluding the newline.\n"
-"If stream is specified the line is\n read from the specified stream.";
+"Reads characters from the serial input or stream up to a newline character, and returns them as a string.";
+//", excluding the newline.\n";
+//"If stream is specified the line is\n read from the specified stream.";
 const char doc187[] = "(write-byte number [stream])\n"
 "Writes a byte to a stream.";
 const char doc188[] = "(write-string string [stream])\n"
-"Writes a string. If stream is specified the string is written to the stream.";
+"Writes a string to serial or stream\n";
+//. If stream is specified the string is written to the stream.";
 const char doc189[] = "(write-line string [stream])\n"
-"Writes a string terminated by a newline character. If stream is specified the string is written to the stream.";
+"Writes a string terminated by a newline character.\n";
+//" If stream is specified the string is written to the stream.";
 const char doc190[] = "(restart-i2c stream [read-p])\n"
 "Restarts an i2c-stream.\n"
 "If read-p is nil or omitted the stream is written to.\n"
@@ -7290,11 +7507,11 @@ const char doc203[] = "(note [pin] [note] [octave])\n"
 const char doc204[] = "(edit 'function)\n"
 "Calls the Lisp tree editor to allow you to edit a function definition.";
 const char doc205[] = "(pprint item [str])\n"
-"Prints its argument, using the pretty printer, to display it formatted in a structured way.\n"
-"If str is specified it prints to the specified stream. It returns no value.";
+"Prints its argument, using the pretty printer, to display it formatted in a structured way.\n";
+//"If str is specified it prints to the specified stream. It returns no value.";
 const char doc206[] = "(pprintall [str])\n"
-"Pretty-prints the definition of every function and variable defined in the uLisp workspace.\n"
-"If str is specified it prints to the specified stream. It returns no value.";
+"Pretty-prints the definition of every function and variable defined in the uLisp workspace.\n";
+//"If str is specified it prints to the specified stream. It returns no value.";
 const char doc207[] = "(require 'symbol)\n"
 "Loads the definition of a function defined with defun, or a variable defined with defvar, from the Lisp Library.\n"
 "It returns t if it was loaded, or nil if the symbol is already defined or isn't defined in the Lisp Library.";
@@ -7324,15 +7541,15 @@ const char doc218[] = "(available stream)\n"
 const char doc219[] = "(wifi-server)\n"
 "Starts a Wi-Fi server running. It returns nil.";
 const char doc220[] = "(wifi-softap ssid [password channel hidden])\n"
-"Set up a soft access point to establish a Wi-Fi network.\n";
-//"Returns the IP address as a string or nil if unsuccessful.";
+"Set up a soft access point to establish a Wi-Fi network.\n"
+"Returns the IP address as a string or nil if unsuccessful.";
 const char doc221[] = "(connected stream)\n"
 "Returns t or nil to indicate if the client on stream is connected.";
 const char doc222[] = "(wifi-localip)\n"
 "Returns the IP address of the local network as a string.";
 const char doc223[] = "(wifi-connect [ssid pass])\n"
-"Connects to the Wi-Fi network ssid using password pass.";
-//" It returns the IP address as a string.";
+"Connects to the Wi-Fi network ssid using password pass."
+" It returns the IP address as a string.";
 const char doc224[] = "(with-gfx (str) form*)\n"
 "Evaluates the forms with str bound to an gfx-stream so you can print text\n"
 "to the graphics display using the standard uLisp print commands.";
@@ -7367,9 +7584,9 @@ const char doc234[] = "(fill-triangle x0 y0 x1 y1 x2 y2 [colour])\n"
 "Draws a filled triangle between (x1,y1), (x2,y2), and (x3,y3).\n";
 //"The outline is drawn in colour, or white if omitted.";
 const char doc235[] = "(draw-char x y char [colour background size])\n"
-"Draws the character char with its top left corner at (x,y).\n"
-"The character is drawn in a 5 x 7 pixel font in colour against background,\n"
-"which default to white and black respectively.\n"
+"Draws the character char in a 5 x 7 pixel font with its top left corner at (x,y).\n"
+//"The character is drawn in a 5 x 7 pixel font in colour against background,\n"
+//"which default to white and black respectively.\n"
 "The character can optionally be scaled by size.";
 const char doc236[] = "(set-cursor x y)\n"
 "Sets the start point for text plotting to (x, y).";
@@ -7423,6 +7640,8 @@ const tbl_entry_t lookup_table[] = {
   { string32, fn_analogread, 0211, doc32 },
   { string33, fn_register, 0212, doc33 },
   { string34, fn_format, 0227, doc34 },
+  // Assembler
+  { stringASM, sp_defcode, 0307, docASM },
   { string35, sp_or, 0307, doc35 },
   { string36, sp_setq, 0327, doc36 },
   { string37, sp_loop, 0307, doc37 },
@@ -7464,7 +7683,7 @@ const tbl_entry_t lookup_table[] = {
   { string73, fn_setfn, 0227, doc73 },
   { string74, fn_streamp, 0211, doc74 },
   { string75, fn_equal, 0222, doc75 },
-  { string76, fn_caar, 0211, doc76 },
+  /*{ string76, fn_caar, 0211, doc76 },
   { string77, fn_cadr, 0211, doc77 },
   { string78, fn_cadr, 0211, NULL },
   { string79, fn_cdar, 0211, doc79 },
@@ -7477,7 +7696,7 @@ const tbl_entry_t lookup_table[] = {
   { string86, fn_cdaar, 0211, doc86 },
   { string87, fn_cdadr, 0211, doc87 },
   { string88, fn_cddar, 0211, doc88 },
-  { string89, fn_cdddr, 0211, doc89 },
+  { string89, fn_cdddr, 0211, doc89 },*/
   { string90, fn_length, 0211, doc90 },
   { string91, fn_arraydimensions, 0211, doc91 },
   { string92, fn_list, 0207, doc92 },
@@ -7605,8 +7824,8 @@ const tbl_entry_t lookup_table[] = {
   { string214, sp_ignoreerrors, 0307, doc214 },
   { string215, sp_error, 0317, doc215 },
   { string216, fn_directory, 0201, doc216 },
+#if defined(ULISP_WIFI)
   { string218, fn_available, 0211, doc218 },
-#ifdef wifi_support
   { string217, sp_withclient, 0317, doc217 },
   { string219, fn_wifiserver, 0200, doc219 },
   { string220, fn_wifisoftap, 0204, doc220 },
@@ -7827,11 +8046,16 @@ object *eval (object *form, object *env) {
     error("undefined", form);
   }
 
+#if defined(CODESIZE)
+if (form->type == CODE) error2("can't evaluate CODE header");
+#endif
+
   // It's a list
   object *function = car(form);
   object *args = cdr(form);
 
-  if (function == NULL) error(illegalfn, function);
+  if (function == NULL)
+	  error(illegalfn, function);
   if (!listp(args)) error("can't evaluate a dotted pair", args);
 
   // List starts with a builtin symbol?
@@ -7892,7 +8116,9 @@ object *eval (object *form, object *env) {
   int TCstart = TC;
   object *head;
   if (consp(function) && !(isbuiltin(car(function), LAMBDA) || isbuiltin(car(function), CLOSURE)
-    || car(function)->type == CODE)) { Context = NIL; error(illegalfn, function); }
+    || car(function)->type == CODE)) { Context = NIL;
+    error(illegalfn, function);
+  }
   if (symbolp(function)) {
     object *pair = findpair(function, env);
     if (pair != NULL) head = cons(cdr(pair), NULL); else head = cons(function, NULL);
@@ -7915,7 +8141,9 @@ object *eval (object *form, object *env) {
   args = cdr(head);
 
   if (symbolp(function)) {
-    if (!builtinp(function->name)) { Context = NIL; error(illegalfn, function); }
+    if (!builtinp(function->name)) {
+    	Context = NIL; error(illegalfn, function);
+    }
     builtin_t bname = builtin(function->name);
     Context = bname;
     checkminmax(bname, nargs);
@@ -7965,6 +8193,14 @@ object *eval (object *form, object *env) {
       }
     }
 
+    if (car(function)->type == CODE) {
+      int n = listlength(second(function));
+      if (nargs<n) errorsym2(fname->name, toofewargs);
+      if (nargs>n) errorsym2(fname->name, toomanyargs);
+      uint32_t entry = startblock(car(function));
+      unprotect();
+      return call(entry, n, args, env);
+    }
   }
   error(illegalfn, fname); return nil;
 }
@@ -8236,6 +8472,7 @@ void printobject (object *form, pfun_t pfun) {
   else if (symbolp(form)) { if (form->name != sym(NOTHING)) printsymbol(form, pfun); }
   else if (characterp(form)) pcharacter(form->chars, pfun);
   else if (stringp(form)) printstring(form, pfun);
+  else if (form->type == CODE) pfstring("code", pfun);
 #ifdef DEF_ARRAY2
   else if (array2p(form)) printarray2(form, pfun); //  Change for ARRAY2
 #endif
@@ -8401,42 +8638,24 @@ int gserial ()
 #ifdef lineeditor
 
   while (!KybdAvailable) {
-#ifndef   tcp_keyboard
     char temp = getch();
-#else
-     char temp = tcp_getch();
-#endif
     processkey(temp);
   }
-  if (ReadPtr != WritePtr)
-  {
-      return KybdBuf[ReadPtr++];
-  }
+  if (ReadPtr != WritePtr) return KybdBuf[ReadPtr++];
   KybdAvailable = 0;
   WritePtr = 0;
   ReadPtr = 0 ;
   return '\n';
 #else
 
-#ifndef   tcp_keyboard
     char temp ;
 
-    do{
+    delay(2);
+    temp = getch();
 
-        temp = getch();
-        delay(2);
-    }while (temp == -1) ;
-#else
-    //char temp = getch();
-     char temp = tcp_getch();
-     clrflag(NOECHO);
-#endif
+    if ((temp != '\n') && (!tstflag(NOECHO))) pserial(temp);
 
-     if ((temp != '\n') && (!tstflag(NOECHO)))
-         pserial(temp);
-
-  if(temp == 27 )
-      setflag(ESCAPE);
+  //if(temp == 27 ) setflag(ESCAPE);
 
   return temp;
 #endif
@@ -8451,8 +8670,9 @@ object *nextitem (gfun_t gfun) {
   while(issp(ch)) ch = gfun();
 
   if (ch == ';') {
-    do { ch = gfun(); if (ch == ';' || ch == '(') setflag(NOECHO); }
+    do { ch = gfun(); /*if (ch == ';' || ch == '(') setflag(NOECHO);*/ }
     while(ch != '(');
+    clrflag(NOECHO);
   }
   if (ch == '\n') ch = gfun();
   if (ch == -1) return nil;
@@ -8656,8 +8876,8 @@ void setup () {
 	init_extensions();
 
 	SysClockRestart() ;
-  int start = millis();
-  while ((millis() - start) < 100) { /*if (Serial) break;*/ }
+  //int start = millis();
+  //while ((millis() - start) < 100) { /*if (Serial) break;*/ }
   #ifdef BOARD_HAS_PSRAM
   /*if (!psramInit()) { Serial.print("the PSRAM couldn't be initialized"); for(;;); }
   Workspace = (object*) ps_malloc(WORKSPACESIZE*8);

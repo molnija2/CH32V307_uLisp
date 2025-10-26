@@ -83,7 +83,7 @@ void RTC_Init()
 	    RTC_WaitForLastTask() ;
 	    RTC_WaitForSynchro() ;
 
-		Delay_Ms(10);
+		//Delay_Ms(10);
 	}
 
 }

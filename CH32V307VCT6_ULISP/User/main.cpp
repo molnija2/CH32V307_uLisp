@@ -156,9 +156,9 @@ void SRAM_init()
 	FSMC_NORSRAMInitStruct.FSMC_WriteTimingStruct = &FSMC_ReadWriteTimingStruct ;
 
 	FSMC_ReadWriteTimingStruct.FSMC_AccessMode = FSMC_AccessMode_A ;
-	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 3 ; //14;//14 ; //14 ; //11
-	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 2 ; //10;//7 ; //14 ; //10
-	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 7 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
+	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 2 ; //14;//14 ; //14 ; //11
+	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 9 ; //10;//7 ; //14 ; //10
+	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 4 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
 	FSMC_ReadWriteTimingStruct.FSMC_BusTurnAroundDuration = 0 ;
 
 
@@ -597,7 +597,7 @@ void freemem(uintptr_t addr)
 }
 
 
-#define UART_BOUDRATE		115200
+#define UART_BOUDRATE		9600//115200
 
 
 /*********************************************************************

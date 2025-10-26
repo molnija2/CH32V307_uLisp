@@ -71,6 +71,7 @@ static u8  iFillAreaDetectMode ;
 #define	true	1
 
 uint8_t  hwSPI = 1;
+static u8 iEscBegin, iTextInv ;
 
 
 
@@ -642,6 +643,9 @@ void ILI9488_begin (void)
 	  //SetFont(1) ;
   //}
   iFillAreaDetectMode = 0 ;
+  iEscBegin = 0 ;
+  iTextInv = 0 ;
+
 
   ILI9488_fillScreen(ILI9488_BLUE) ;
   //iCurrentBkColor = ILI9488_BLACK ;
@@ -1134,6 +1138,10 @@ void LCD_settextBkMode(uint8_t  mode)
 }
 
 
+
+static char TxtCmd[12] ;
+
+
 void LCD_drawChar (u8 asciiCode)
 {
     /*if(send_data_mode)
@@ -1142,8 +1150,9 @@ void LCD_drawChar (u8 asciiCode)
     	return ;
     }*/
 
+
     u8 fontSize = iCurrentCharMultSize ;
-    uint16_t color = iCurrentTextColor ;
+    uint16_t color = iCurrentTextColor, bkcolor = iCurrentBkColor ;
 
     u8 charH, charW ;
 
@@ -1151,28 +1160,56 @@ void LCD_drawChar (u8 asciiCode)
     charH = iCurrentCharMultSize*FontCurrent->Height ;
     charW = iCurrentCharMultSize*FontCurrent->Width ;
 
+	if(asciiCode == 8)	{	iCurrentX -= charW ; return ; }
+	if(asciiCode == '\e')	{iEscBegin = 1 ; return ; }
+
+	if(iEscBegin >0 ) {
+		TxtCmd[iEscBegin] = asciiCode ;
+		if(TxtCmd[iEscBegin]=='m')
+		{
+			if(TxtCmd[2]=='0') iTextInv = 0 ;
+			if(TxtCmd[2]=='7') iTextInv = 1 ;
+		}
+		int p = (TxtCmd[2]-'0')*100 +(TxtCmd[3]-'0')*10 + (TxtCmd[4]-'0') ;
+		if(TxtCmd[iEscBegin]=='A')	iCurrentY -=charH*p ;
+		if(TxtCmd[iEscBegin]=='B')	iCurrentY +=charH*p ;
+		if(TxtCmd[iEscBegin]=='D') iCurrentX -=charW*p ;
+		if(TxtCmd[iEscBegin]=='C') iCurrentX +=charW*p ;
+		iEscBegin ++ ;
+		if((iEscBegin>3) && (asciiCode>'9')) iEscBegin = 0 ;
+		return ;
+	}
+
+
+
+
+	if(iTextInv == 1 ){
+		bkcolor = iCurrentTextColor ;
+		color = iCurrentBkColor ;
+	}
+
     if(iTextWrap)
     	if((iCurrentX+charW)>=_width)
     {
     	iCurrentX = 0 ;
-    	iCurrentY += charH + /*(charH>>2)*/ 0 ;
+    	iCurrentY += charH ;
     	if((iCurrentY+charH)>=_height)
     	{
     		iCurrentY = 0 ;
     	}
-    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, iCurrentBkColor) ;
+    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, bkcolor) ;
     }
 
     if(asciiCode=='\n')
     {
     	iCurrentX = 0 ;
-    	iCurrentY += charH + /*(charH>>2)*/ 0 ;
+    	iCurrentY += charH  ;
     	if((iCurrentY+charH)>=_height)
     	{
     		iCurrentY = 0 ;
     		//ILI9488_fillScreen(iCurrentBkColor) ;
     	}
-    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, iCurrentBkColor) ;
+    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, bkcolor) ;
     	return ;
     }
 
@@ -1212,7 +1249,7 @@ void LCD_drawChar (u8 asciiCode)
         	  else
         	  {
         		  if(iCurrentCharMultSize>1) LCD_Fill_Fast(x, y, x+fontSize, y+fontSize, iCurrentBkColor);
-        		  else	write16BitColor(iCurrentBkColor);
+        		  else	write16BitColor(bkcolor);
         	  }
           }
         }
@@ -1241,7 +1278,7 @@ void LCD_drawChar (u8 asciiCode)
     	  else
     	  {
     		  if(iCurrentCharMultSize>1) LCD_Fill_Fast(x, y, x+fontSize, y+fontSize, iCurrentBkColor);
-    		  else	write16BitColor(iCurrentBkColor);
+    		  else	write16BitColor(bkcolor);
     	  }
 
     	  if(FontCurrent == FontInfo) ibit<<=1 ;

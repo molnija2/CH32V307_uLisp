@@ -491,7 +491,7 @@ const char doc_getscrmaxy[]  = "(getscrmaxy)\n"
 // Symbol lookup table
 const tbl_entry_t lookup_table2[]  = {
 
-    { stringnow, fn_now, 0206, docnow },
+    { stringnow, fn_now, 0206, /*docnow*/NULL },
 
 #ifdef touchscreen_support
     { stringtouch_press, fn_touch_press, 0200, /*doctouch_press*/NULL },
@@ -513,7 +513,7 @@ const tbl_entry_t lookup_table2[]  = {
 
 #ifdef filesys_commands
     //{ string_probefile, fn_probefile, 0211, /*doc_probefile*/ NULL },
-    { string_renamefile, fn_renamefile, 0222, /*doc_renamefile*/ NULL},
+    { string_renamefile, fn_renamefile, 0222, /*doc_renamefile*/NULL},
     //{ string_copyfile, fn_copyfile, 0222, /*doc_copyfile*/NULL },
     { string_deletefile, fn_deletefile, 0211, /*doc_deletefile*/ NULL },
     { string_ensuredir, fn_ensuredir, 0211, /*doc_ensuredir*/ NULL },
@@ -524,7 +524,7 @@ const tbl_entry_t lookup_table2[]  = {
 
 
 #ifdef graphics_package
-    { string_kbhit, fn_kbhit, 0200, doc_kbhit },
+    { string_kbhit, fn_kbhit, 0200, /*doc_kbhit*/NULL },
     { string_loadfont, fn_loadfont, 0222, doc_loadfont },
     { string_setfont, fn_setfont, 0211, doc_setfont },
     { string_getfontheight, fn_getfontheight, 0200, /*doc_getfontheight*/NULL },
