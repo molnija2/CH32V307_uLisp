@@ -63,7 +63,7 @@ uint8_t  iFontsNumber, send_data_mode ;
 
 uint8_t  tabcolor;
 
-static int16_t MinX[ILI9488_TFTHEIGHT],MaxX[ILI9488_TFTHEIGHT] ;
+static int16_t MinX[LCD_TFTHEIGHT],MaxX[LCD_TFTHEIGHT] ;
 static int iFillMinY, iFillMaxY ;
 static u8  iFillAreaDetectMode ;
 
@@ -174,7 +174,7 @@ void LCD_Writ_Bus(uint8_t byte)
 	GPIO_SetBits(GPIOC, byte);
     LCD_WR_Clr() ;
     LCD_WR_Set() ;
-    LCD_CS_Set();
+    //LCD_CS_Set();
 }
 
 
@@ -185,10 +185,28 @@ void LCD_WR_DATA8(uint8_t byte)
     LCD_Writ_Bus(byte) ;
 }
 
+
+void LCD_WR_DATA16(uint16_t data)
+{
+	LCD_CS_Clr() ;
+    LCD_DC_Set() ;
+    LCD_Writ_Bus(data>>8) ;
+    LCD_Writ_Bus(data&0xff) ;
+}
+
+
 void LCD_WR_REG(uint16_t byte)
 {
     LCD_DC_Clr() ;
+
+#ifdef	LCD_ILI9488H_TYPE
     LCD_Writ_Bus(byte) ;
+#else
+	#ifdef	LCD_NT35510_TYPE
+    LCD_Writ_Bus(byte>>8) ;
+    LCD_Writ_Bus(byte&0xff) ;
+	#endif
+#endif
     LCD_DC_Set() ;
 }
 
@@ -419,14 +437,30 @@ int LCD_Read_Bus()
 {
 	int data ;
 
-	lcd_SET_BUS_INPUT();
-	LCD_CS_Clr();
+
+#ifdef	LCD_ILI9488H_TYPE
+
 	LCD_DC_Set();
     LCD_RD_Clr() ;
+    Delay_Us(1);
     data = GPIO_ReadInputData(GPIOC) & 0xff;
     LCD_RD_Set() ;
-	LCD_CS_Set();
-	lcd_SET_BUS_OUTPUT();
+
+#else
+	#ifdef	LCD_NT35510_TYPE
+	//lcd_SET_BUS_INPUT();
+	//LCD_CS_Clr();
+	LCD_DC_Set();
+    LCD_RD_Clr() ;
+    Delay_Us(1);
+    data = GPIO_ReadInputData(GPIOC) & 0xff;
+    LCD_RD_Set() ;
+    //LCD_CS_Set();
+    //lcd_SET_BUS_OUTPUT();
+	#endif
+#endif
+
+	// chanded 9-11-2025
 	return data ;
 }
 
@@ -462,7 +496,7 @@ void spi_end() {} ;
 
 // Companion code to the above tables.  Reads and issues
 // a series of LCD commands stored in PROGMEM byte array.
-/*void ILI9488_commandList(uint8_t *addr) {
+/*void LCD_commandList(uint8_t *addr) {
 
   uint8_t  numCommands, numArgs;
   uint16_t ms;
@@ -495,6 +529,10 @@ void spi_end() {} ;
 #define MADCTL_MH  0x04
 
 
+#define ST_CMD_DELAY 0x80 // special signifier for command lists
+
+#ifdef	LCD_ILI9488H_TYPE
+
 static const uint8_t  gammaP[] ={	0x00,0x03,0x09,0x08,0x16,0x0A,
 		0x3F,0x78,0x4C,0x09,0x0A,0x08,0x16,0x1A,0x0F
 };
@@ -508,9 +546,6 @@ static const uint8_t  gammaN[] ={	0x00,0x16,0x19,0x03,0x0F,0x05,
 static const uint8_t gammaN[] = {0x00, 0x13, 0x16, 0x04, 0x11, 0x07, 0x37, 0x46,
 		0x4D, 0x06, 0x10, 0x0E, 0x35, 0x37, 0x0F} ;*/
 
-
-
-#define ST_CMD_DELAY 0x80 // special signifier for command lists
 
 
 void CommonInit(const uint8_t *cmdlist)
@@ -556,7 +591,7 @@ const uint8_t  Start_commands[] ={
 		0x12,    	//Vcom
 		0x80,
 
-	    ILI9488_SLPOUT, ST_CMD_DELAY,    //Exit Sleep
+		ILI9488H_SLPOUT, ST_CMD_DELAY,    //Exit Sleep
 		120,
 
 		0x3A, 1,		// Interface Pixel Format
@@ -584,17 +619,168 @@ const uint8_t  Start_commands[] ={
 		0x2C,
 		0x82,			// D7 stream, loose
 
-		ILI9488_DISPON, 0    //Display on
+		ILI9488H_DISPON, 0    //Display on
+};
+#endif
+
+#ifdef	LCD_NT35510_TYPE
+
+
+// Decompose a 16-bit display command into high & low uint8_t's for array
+#define CmdHiLo(_x_) (_x_ >> 8), (_x_ & 0xFF)
+
+// Adapted from EastRising example code:
+static const uint8_t
+initCmd1[] = {
+  // Most of these registers are not in the datasheet
+  // 35510h
+  CmdHiLo(0xF000), 5, 0x55, 0xAA, 0x52, 0x08, 0x01,
+  // AVDD Set AVDD 5.2V
+  CmdHiLo(0xB000), 3, 0x0D, 0x0D, 0x0D,
+  // AVDD ratio
+  CmdHiLo(0xB600), 3, 0x34, 0x34, 0x34,
+  // AVEE  -5.2V
+  CmdHiLo(0xB100), 3, 0x0D, 0x0D, 0x0D,
+  // AVEE ratio
+  CmdHiLo(0xB700), 3, 0x34, 0x34, 0x34,
+  // VCL  -2.5V
+  CmdHiLo(0xB200), 3, 0x00, 0x00, 0x00,
+  // VCL ratio
+  CmdHiLo(0xB800), 3, 0x24, 0x24, 0x24,
+  // VGH  15V
+  CmdHiLo(0xBF00), 1, 0x01,
+  CmdHiLo(0xB300), 3, 0x0F, 0x0F, 0x0F,
+  // VGH  ratio
+  CmdHiLo(0xB900), 3, 0x34, 0x34, 0x34,
+  // VGL_REG  -10V
+  CmdHiLo(0xB500), 1, 0x08,
+  CmdHiLo(0xB500), 2, 0x08, 0x08,
+  CmdHiLo(0xC200), 1, 0x03,
+  // VGLX  ratio
+  CmdHiLo(0xBA00), 3, 0x24, 0x24, 0x24,
+  // VGMP/VGSP 4.5V/0V
+  CmdHiLo(0xBC00), 3, 0x00, 0x78, 0x00,
+  // VGMN/VGSN -4.5V/0V
+  CmdHiLo(0xBD00), 3, 0x00, 0x78, 0x00,
+  // VCOM  -1.325V
+  CmdHiLo(0xBE00), 2, 0x00, 0x89,
+  // Gamma Setting
+  CmdHiLo(0xD100), 52,
+    0x00, 0x2D, 0x00, 0x2E, 0x00, 0x32, 0x00, 0x44, 0x00, 0x53,
+    0x00, 0x88, 0x00, 0xB6, 0x00, 0xF3, 0x01, 0x22, 0x01, 0x64,
+    0x01, 0x92, 0x01, 0xD4, 0x02, 0x07, 0x02, 0x08, 0x02, 0x34,
+    0x02, 0x5F, 0x02, 0x78, 0x02, 0x94, 0x02, 0xA6, 0x02, 0xBB,
+    0x02, 0xCA, 0x02, 0xDB, 0x02, 0xE8, 0x02, 0xF9, 0x03, 0x1F,
+    0x03, 0x7F,
+  CmdHiLo(0xD200), 52,
+    0x00, 0x2D, 0x00, 0x2E, 0x00, 0x32, 0x00, 0x44, 0x00, 0x53,
+    0x00, 0x88, 0x00, 0xB6, 0x00, 0xF3, 0x01, 0x22, 0x01, 0x64,
+    0x01, 0x92, 0x01, 0xD4, 0x02, 0x07, 0x02, 0x08, 0x02, 0x34,
+    0x02, 0x5F, 0x02, 0x78, 0x02, 0x94, 0x02, 0xA6, 0x02, 0xBB,
+    0x02, 0xCA, 0x02, 0xDB, 0x02, 0xE8, 0x02, 0xF9, 0x03, 0x1F,
+    0x03, 0x7F,
+  CmdHiLo(0xD300), 52,
+    0x00, 0x2D, 0x00, 0x2E, 0x00, 0x32, 0x00, 0x44, 0x00, 0x53,
+    0x00, 0x88, 0x00, 0xB6, 0x00, 0xF3, 0x01, 0x22, 0x01, 0x64,
+    0x01, 0x92, 0x01, 0xD4, 0x02, 0x07, 0x02, 0x08, 0x02, 0x34,
+    0x02, 0x5F, 0x02, 0x78, 0x02, 0x94, 0x02, 0xA6, 0x02, 0xBB,
+    0x02, 0xCA, 0x02, 0xDB, 0x02, 0xE8, 0x02, 0xF9, 0x03, 0x1F,
+    0x03, 0x7F,
+  CmdHiLo(0xD400), 52,
+    0x00, 0x2D, 0x00, 0x2E, 0x00, 0x32, 0x00, 0x44, 0x00, 0x53,
+    0x00, 0x88, 0x00, 0xB6, 0x00, 0xF3, 0x01, 0x22, 0x01, 0x64,
+    0x01, 0x92, 0x01, 0xD4, 0x02, 0x07, 0x02, 0x08, 0x02, 0x34,
+    0x02, 0x5F, 0x02, 0x78, 0x02, 0x94, 0x02, 0xA6, 0x02, 0xBB,
+    0x02, 0xCA, 0x02, 0xDB, 0x02, 0xE8, 0x02, 0xF9, 0x03, 0x1F,
+    0x03, 0x7F,
+  CmdHiLo(0xD500), 52,
+    0x00, 0x2D, 0x00, 0x2E, 0x00, 0x32, 0x00, 0x44, 0x00, 0x53,
+    0x00, 0x88, 0x00, 0xB6, 0x00, 0xF3, 0x01, 0x22, 0x01, 0x64,
+    0x01, 0x92, 0x01, 0xD4, 0x02, 0x07, 0x02, 0x08, 0x02, 0x34,
+    0x02, 0x5F, 0x02, 0x78, 0x02, 0x94, 0x02, 0xA6, 0x02, 0xBB,
+    0x02, 0xCA, 0x02, 0xDB, 0x02, 0xE8, 0x02, 0xF9, 0x03, 0x1F,
+    0x03, 0x7F,
+  CmdHiLo(0xD600), 52,
+    0x00, 0x2D, 0x00, 0x2E, 0x00, 0x32, 0x00, 0x44, 0x00, 0x53,
+    0x00, 0x88, 0x00, 0xB6, 0x00, 0xF3, 0x01, 0x22, 0x01, 0x64,
+    0x01, 0x92, 0x01, 0xD4, 0x02, 0x07, 0x02, 0x08, 0x02, 0x34,
+    0x02, 0x5F, 0x02, 0x78, 0x02, 0x94, 0x02, 0xA6, 0x02, 0xBB,
+    0x02, 0xCA, 0x02, 0xDB, 0x02, 0xE8, 0x02, 0xF9, 0x03, 0x1F,
+    0x03, 0x7F,
+  // LV2 Page 0 enable
+  CmdHiLo(0xF000), 5, 0x55, 0xAA, 0x52, 0x08, 0x00,
+  // Display control
+  CmdHiLo(0xB100), 2, 0xCC, 0x00,
+  0, },
+
+initCmdHSDLCD[] = { // IPS
+  CmdHiLo(0xB500), 1, 0x6b,
+  0, },
+
+initCmdCPTLCD[] = { // TN
+  CmdHiLo(0xB500), 1, 0x50,
+  0, },
+initCmd2[] = {
+  // Source hold time
+  CmdHiLo(0xB600), 1, 0x05,
+  // Set Gate EQ
+  CmdHiLo(0xB700), 2, 0x70, 0x70,
+  // Source EQ control (Mode 2)
+  CmdHiLo(0xB800), 4, 0x01, 0x03, 0x03, 0x03,
+  // INVERSION MODE
+  CmdHiLo(0xBC00), 3, 0x02, 0x00, 0x00,
+  // Timing control
+  CmdHiLo(0xC900), 5, 0xD0, 0x02, 0x50, 0x50, 0x50,
+  CmdHiLo(NT35510_TEOFF)  ,   1, 0x00, // Tearing effect line on
+  CmdHiLo(NT35510_COLMOD),   1, 0x77, // Data format 16 bits
+  CmdHiLo(NT35510_MADCTL),   1, 0x00, // Memory access control
+  CmdHiLo(NT35510_SLPOUT), 128,       // Sleep out, no args, delay 120 ms
+  CmdHiLo(NT35510_DISPON), 128,       // Display on, no args, delay 120 ms
+  0,
 };
 
 
-void ILI9488_begin (void)
+void sendCommand16(uint16_t cmd, const uint8_t *dataw, int n)
+{
+
+    LCD_DC_Clr() ;
+    LCD_CS_Clr() ;
+	LCD_Writ_Bus((cmd>>8) & DEF_GPIO_DATA8);
+	LCD_Writ_Bus( cmd & DEF_GPIO_DATA8);
+    LCD_DC_Set() ;
+
+    for(int i=0;i<n;i++)
+    {
+    	LCD_Writ_Bus(0);
+    	LCD_Writ_Bus(*dataw++);
+    }
+
+    LCD_CS_Set() ;
+}
+
+void displayInit(const uint8_t *addr)
+{
+    uint16_t        cmdHi, cmdLo, x, numArgs;
+    while((cmdHi = *addr++) > 0) {
+        cmdLo    = *addr++ ;
+        x        = *addr++ ;
+        numArgs  = x & 0x7F;
+        sendCommand16((cmdHi << 8) | cmdLo, addr, numArgs);
+        addr += numArgs;
+        if(x & 0x80) Delay_Ms(120);
+    }
+}
+
+#endif
+
+
+void LCD_begin (void)
 {
 	lcd_GPIO_init();
 
+#ifdef	LCD_ILI9488H_TYPE
+
 	LCD_RES_Clr();
-
-
 
     LCD_CS_Set();
     LCD_DC_Set();
@@ -615,19 +801,39 @@ void ILI9488_begin (void)
 	lcd_SendDataN(gammaN,15);
 
 	CommonInit(Start_commands) ;
+#else
+ #ifdef	LCD_NT35510_TYPE
 
+	Delay_Ms(10);
+	LCD_RES_Clr();
+	Delay_Ms(10);
+	LCD_RES_Set();
+	Delay_Ms(10);
+                        // If no hardware reset pin...
+    sendCommand16(NT35510_SWRESET, 0, 0); // Engage software reset
+    Delay_Ms(150);
+
+    displayInit(initCmd1);      // Common init, part 1
+
+    //displayInit(initCmdHSDLCD); // IPS-specific init
+
+    displayInit(initCmdCPTLCD); // TN-specific init
+    displayInit(initCmd2);      // Common init, continued
+
+ #endif
+#endif
 
 
   LCD_BLK_Set();
 
-  ILI9488_setRotation(0) ;
+  LCD_setRotation(0) ;
 
 
   iCurrentX = 0 ;
   iCurrentY = 0 ;
   iCurrentCharMultSize = 1 ;
-  iCurrentColor = ILI9488_WHITE ;
-  iCurrentTextColor = ILI9488_WHITE ;
+  iCurrentColor = LCD_WHITE ;
+  iCurrentTextColor = LCD_WHITE ;
   iTextBkMode = 0 ;
 
   iTextWrap = 1 ;
@@ -647,23 +853,23 @@ void ILI9488_begin (void)
   iTextInv = 0 ;
 
 
-  ILI9488_fillScreen(ILI9488_BLUE) ;
-  //iCurrentBkColor = ILI9488_BLACK ;
-  //LCDTextXY(10,10,"Hello World !", ILI9488_GREEN, 1) ;
+  LCD_fillScreen(LCD_BLUE) ;
+  //iCurrentBkColor = LCD_BLACK ;
+  //LCDTextXY(10,10,"Hello World !", LCD_GREEN, 1) ;
 
 
-  //ILI9488_fillRect(10, 10,  300, 300, ILI9488_BLACK);
+  //LCD_fillRect(10, 10,  300, 300, LCD_BLACK);
 
   //void LCD_Fill_Fast(u16 xsta,u16 ysta,u16 xend,u16 yend,u16 color);
-  //LCD_Fill_Fast(10, 10,  300, 300, ILI9488_BLACK);
+  //LCD_Fill_Fast(10, 10,  300, 300, LCD_BLACK);
 
-  //ILI9488_drawPixel(100, 100, ILI9488_WHITE);
+  //LCD_drawPixel(100, 100, LCD_WHITE);
 }
 
 
 
 
-void ILI9488_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea){
+void LCD_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea){
 
   if (hwSPI) spi_begin();
   LCD_WR_REG(0x33); // Vertical scroll definition
@@ -675,7 +881,7 @@ void ILI9488_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea){
   LCD_WR_DATA8(bottomFixedArea);
   if (hwSPI) spi_end();
 }
-void ILI9488_scroll(uint16_t pixels){
+void LCD_scroll(uint16_t pixels){
   if (hwSPI) spi_begin();
   LCD_WR_REG(0x37); // Vertical scrolling start address
   LCD_WR_DATA8(pixels >> 8);
@@ -683,7 +889,8 @@ void ILI9488_scroll(uint16_t pixels){
   if (hwSPI) spi_end();
 }
 
-void ILI9488_setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
+#ifdef	LCD_ILI9488H_TYPE
+void LCD_setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
  uint16_t y1)
 {
 
@@ -691,17 +898,18 @@ void ILI9488_setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
 	uint8_t data2[4] = { (uint8_t)(y0>>8), (uint8_t)(y0&0xff), (uint8_t)(y1>>8), (uint8_t)(y1&0xff) };
 
 	//y0 = 10 ;
-  LCD_WR_REG(ILI9488_CASET); // Column addr set
+  LCD_WR_REG(ILI9488H_CASET); // Column addr set
   lcd_SendDataN((uint8_t*)data, 4);
 
-  LCD_WR_REG(ILI9488_PASET); // Row addr set
+  LCD_WR_REG(ILI9488H_PASET); // Row addr set
   lcd_SendDataN((uint8_t*)data2, 4);
 
 
-  LCD_WR_REG(ILI9488_RAMWR); // write to RAM
+  LCD_WR_REG(ILI9488H_RAMWR); // write to RAM
 }
+#endif
 
-/*void ILI9488_drawImage(const uint8_t* img, uint16_t x, uint16_t y, uint16_t w, uint16_t h){
+/*void LCD_drawImage(const uint8_t* img, uint16_t x, uint16_t y, uint16_t w, uint16_t h){
 
     // rudimentary clipping (drawChar w/big text requires this)
     if((x >= _width) || (y >= _height)) return;
@@ -709,7 +917,7 @@ void ILI9488_setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1,
     if((y + h - 1) >= _height) h = _height - y;
 
     if (hwSPI) spi_begin();
-    ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
+    LCD_setAddrWindow(x, y, x+w-1, y+h-1);
 
     // uint8_t hi = color >> 8, lo = color;
 
@@ -804,7 +1012,7 @@ void write16BitColor(uint16_t color)
   // #endif
 }
 
-void ILI9488_drawPixel (int16_t x, int16_t y, uint16_t color) {
+void LCD_drawPixel (int16_t x, int16_t y, uint16_t color) {
 
   if((x < 0) ||(x >= _width) || (y < 0) || (y >= _height)) return;
 
@@ -812,7 +1020,7 @@ void ILI9488_drawPixel (int16_t x, int16_t y, uint16_t color) {
 	  TestXYAreaPoint(x,y) ;
 
   if (hwSPI) spi_begin();
-  ILI9488_setAddrWindow(x,y,x+1,y+1);
+  LCD_setAddrWindow(x,y,x+1,y+1);
 
 #if defined(USE_FAST_PINIO) && !defined (_VARIANT_ARDUINO_STM32_)
   *dcport |=  dcpinmask;
@@ -835,7 +1043,7 @@ void ILI9488_drawPixel (int16_t x, int16_t y, uint16_t color) {
 }
 
 
-void ILI9488_drawFastVLine(int16_t x, int16_t y, int16_t h,
+void LCD_drawFastVLine(int16_t x, int16_t y, int16_t h,
  uint16_t color) {
 
   // Rudimentary clipping
@@ -851,7 +1059,7 @@ void ILI9488_drawFastVLine(int16_t x, int16_t y, int16_t h,
 		for(int y2 = y; y2<y+h-1;y2++) TestXYAreaPoint( x, y2);
   }
 
-  ILI9488_setAddrWindow(x, y, x, y+h-1);
+  LCD_setAddrWindow(x, y, x, y+h-1);
 
 //  uint8_t hi = color >> 8, lo = color;
 
@@ -879,7 +1087,7 @@ void ILI9488_drawFastVLine(int16_t x, int16_t y, int16_t h,
 }
 
 
-void ILI9488_drawFastHLine(int16_t x, int16_t y, int16_t w,
+void LCD_drawFastHLine(int16_t x, int16_t y, int16_t w,
   uint16_t color) {
 
   // Rudimentary clipping
@@ -896,7 +1104,7 @@ void ILI9488_drawFastHLine(int16_t x, int16_t y, int16_t w,
 		if(MaxX[y]<x2) MaxX[y] = x2 ;*/
   }
 
-  ILI9488_setAddrWindow(x, y, x+w-1, y);
+  LCD_setAddrWindow(x, y, x+w-1, y);
 
   // uint8_t hi = color >> 8, lo = color;
 #if defined(USE_FAST_PINIO) && !defined (_VARIANT_ARDUINO_STM32_)
@@ -918,8 +1126,8 @@ void ILI9488_drawFastHLine(int16_t x, int16_t y, int16_t w,
   if (hwSPI) spi_end();
 }
 
-void ILI9488_fillScreen(uint16_t color) {
-	ILI9488_fillRect(0, 0,  _width, _height, color);
+void LCD_fillScreen(uint16_t color) {
+	LCD_fillRect(0, 0,  _width, _height, color);
 	iCurrentBkColor = color ;
 }
 
@@ -932,7 +1140,7 @@ void LCD_Fill_Fast(u16 xsta,u16 ysta,u16 xend,u16 yend,u16 color)
     if((xsta >= _width) || (ysta >= _height)) return;
     if((xend <=0) || (yend <= 0)) return;
 
-    ILI9488_setAddrWindow(xsta,ysta,xend-1,yend-1);
+    LCD_setAddrWindow(xsta,ysta,xend-1,yend-1);
 
     LCD_DC_Set();
     LCD_CS_Clr();
@@ -958,7 +1166,7 @@ void LCD_Fill_Fast(u16 xsta,u16 ysta,u16 xend,u16 yend,u16 color)
 }
 
 
-void ILI9488_fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
+void LCD_fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
   uint16_t color) {
 
 	LCD_Fill_Fast(x, y, x+w, y+h, color);
@@ -968,49 +1176,193 @@ void ILI9488_fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
 
 
 // Pass 8-bit (each) R,G,B, get back 16-bit packed color
-uint16_t ILI9488_color565(uint8_t r, uint8_t g, uint8_t b) {
+uint16_t LCD_color565(uint8_t r, uint8_t g, uint8_t b) {
   return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
 
 
+#ifdef	LCD_ILI9488H_TYPE
 
-void ILI9488_setRotation(uint8_t m) {
+void LCD_setRotation(uint8_t m) {
 
   if (hwSPI) spi_begin();
-  LCD_WR_REG(ILI9488_MADCTL);
+  LCD_WR_REG(ILI9488H_MADCTL);
   rotation = m % 4; // can't be higher than 3
   switch (rotation) {
    case 0:
      LCD_WR_DATA8(MADCTL_MX | MADCTL_BGR);
-     _width  = ILI9488_TFTWIDTH;
-     _height = ILI9488_TFTHEIGHT;
+     _width  = LCD_TFTWIDTH;
+     _height = LCD_TFTHEIGHT;
      break;
    case 1:
      LCD_WR_DATA8(MADCTL_MV | MADCTL_BGR);
-     _width  = ILI9488_TFTHEIGHT;
-     _height = ILI9488_TFTWIDTH;
+     _width  = LCD_TFTHEIGHT;
+     _height = LCD_TFTWIDTH;
      break;
   case 2:
     LCD_WR_DATA8(MADCTL_MY | MADCTL_BGR);
-     _width  = ILI9488_TFTWIDTH;
-     _height = ILI9488_TFTHEIGHT;
+     _width  = LCD_TFTWIDTH;
+     _height = LCD_TFTHEIGHT;
     break;
    case 3:
      LCD_WR_DATA8(MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR);
-     _width  = ILI9488_TFTHEIGHT;
-     _height = ILI9488_TFTWIDTH;
+     _width  = LCD_TFTHEIGHT;
+     _height = LCD_TFTWIDTH;
      break;
   }
   if (hwSPI) spi_end();
 }
 
 
-void ILI9488_invertDisplay(boolean i) {
+void LCD_invertDisplay(boolean i) {
   if (hwSPI) spi_begin();
-  LCD_WR_REG(i ? ILI9488_INVON : ILI9488_INVOFF);
+  LCD_WR_REG(i ? ILI9488H_INVON : ILI9488H_INVOFF);
   if (hwSPI) spi_end();
 }
 
+#else
+#ifdef	LCD_NT35510_TYPE
+
+void LCD_invertDisplay(boolean invert) {
+    sendCommand16(invert ? NT35510_INVON : NT35510_INVOFF, 0,0);
+}
+
+/**************************************************************************/
+/*!
+    @brief   Set the "address window" - the rectangle we will write to RAM
+             with the next chunk of SPI data writes. The NT35510 will
+             automatically wrap the data as each row is filled.
+    @param   x1  TFT memory 'x' origin
+    @param   y1  TFT memory 'y' origin
+    @param   w   Width of rectangle
+    @param   h   Height of rectangle
+*/
+/**************************************************************************/
+void LCD_setAddrWindow(
+  uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
+    /*uint16_t x2 = (x1 + w - 1),
+             y2 = (y1 + h - 1);*/
+    // Unfortunately yes, it DOES seem to be necessary
+    // to writeCommand for each byte out.
+#if 0
+    // This is SUPER rigged for 16-bit parallel interface
+    // with SAMD51 (has port set/clear registers)
+    SPI_DC_LOW(); // Command
+    *(volatile uint16_t *)tft8.writePort = NT35510_CASET;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH(); // Data
+    *(volatile uint16_t *)tft8.writePort = x1 >> 8;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_CASET + 1;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = x1 & 0xFF;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_CASET + 2;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = x2 >> 8;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_CASET + 3;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = x2 & 0xFF;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_RASET;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = y1 >> 8;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_RASET + 1;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = y1 & 0xFF;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_RASET + 2;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = y2 >> 8;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_RASET + 3;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+    *(volatile uint16_t *)tft8.writePort = y2 & 0xFF;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+
+    SPI_DC_LOW();
+    *(volatile uint16_t *)tft8.writePort = NT35510_RAMWR;
+    *tft8.wrPortClr = tft8.wrPinMask; *tft8.wrPortSet = tft8.wrPinMask;
+    SPI_DC_HIGH();
+#else
+    sendCommand16(NT35510_CASET,0,0); // Column address set
+    LCD_WR_DATA16(x1 >> 8);
+    sendCommand16(NT35510_CASET + 1,0,0);
+    LCD_WR_DATA16(x1 & 0xFF);
+    sendCommand16(NT35510_CASET + 2,0,0);
+    LCD_WR_DATA16(x2 >> 8);
+    sendCommand16(NT35510_CASET + 3,0,0);
+    LCD_WR_DATA16(x2 & 0xFF);
+    sendCommand16(NT35510_RASET,0,0); // Row address set
+    LCD_WR_DATA16(y1 >> 8);
+    sendCommand16(NT35510_RASET + 1,0,0);
+    LCD_WR_DATA16(y1 & 0xFF);
+    sendCommand16(NT35510_RASET + 2,0,0);
+    LCD_WR_DATA16(y2 >> 8);
+    sendCommand16(NT35510_RASET + 3,0,0);
+    LCD_WR_DATA16(y2 & 0xFF);
+    sendCommand16(NT35510_RAMWR,0,0); // Write to RAM
+#endif
+}
+
+
+
+
+void LCD_setRotation(uint8_t m) {
+
+  if (hwSPI) spi_begin();
+  LCD_WR_REG(NT35510_MADCTL);
+  rotation = m % 4; // can't be higher than 3
+  switch (rotation) {
+   case 0:
+     LCD_WR_DATA16( MADCTL_RGB);
+     _width  = LCD_TFTWIDTH;
+     _height = LCD_TFTHEIGHT;
+     break;
+   case 1:
+     LCD_WR_DATA16(MADCTL_MV | MADCTL_MX | MADCTL_RGB);
+     _width  = LCD_TFTHEIGHT;
+     _height = LCD_TFTWIDTH;
+     break;
+  case 2:
+    LCD_WR_DATA16(MADCTL_MY| MADCTL_MX | MADCTL_RGB);
+     _width  = LCD_TFTWIDTH;
+     _height = LCD_TFTHEIGHT;
+    break;
+   case 3:
+     LCD_WR_DATA16(MADCTL_MY | MADCTL_MV | MADCTL_RGB);
+     _width  = LCD_TFTHEIGHT;
+     _height = LCD_TFTWIDTH;
+     break;
+  }
+  if (hwSPI) spi_end();
+}
+
+#endif
+#endif
 
 ////////// stuff not actively being used, but kept for posterity
 
@@ -1026,7 +1378,7 @@ void ILI9488_invertDisplay(boolean i) {
   return r;
 }*/
 
- uint8_t ILI9488_readdata(void) {
+ uint8_t LCD_readdata(void) {
    LCD_DC_Set();
    LCD_CS_Clr();
    //uint8_t r = spiread();
@@ -1037,7 +1389,7 @@ void ILI9488_invertDisplay(boolean i) {
 }
 
 
-uint8_t ILI9488_readcommand8(uint8_t c, uint8_t index) {
+uint8_t LCD_readcommand8(uint8_t c, uint8_t index) {
    if (hwSPI) spi_begin();
    LCD_DC_Clr(); // command
    LCD_CS_Clr();
@@ -1207,9 +1559,17 @@ void LCD_drawChar (u8 asciiCode)
     	if((iCurrentY+charH)>=_height)
     	{
     		iCurrentY = 0 ;
-    		//ILI9488_fillScreen(iCurrentBkColor) ;
+    		//LCD_fillScreen(iCurrentBkColor) ;
     	}
     	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, bkcolor) ;
+    	return ;
+    }
+
+    if(asciiCode==12)
+    {
+    	LCD_fillScreen(bkcolor) ;
+    	iCurrentX = 0 ;
+    	iCurrentY = 0 ;
     	return ;
     }
 
@@ -1217,7 +1577,7 @@ void LCD_drawChar (u8 asciiCode)
     //if((FontCurrent == FontInfo ) && (FontCurrent->Dir == 1))
     //	LCD_Fill_Fast(iCurrentX, iCurrentY, iCurrentX+charW, iCurrentY+charH, iCurrentBkColor);
 
-    ILI9488_setAddrWindow(iCurrentX, iCurrentY, iCurrentX+charW-1, iCurrentY+charH-1);
+    LCD_setAddrWindow(iCurrentX, iCurrentY, iCurrentX+charW-1, iCurrentY+charH-1);
 
     if(FontCurrent == FontInfo ) asciiCode -=0x20 ;
 
@@ -1328,7 +1688,7 @@ void LCD_DrawLine (int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t colo
     int error = dx + dy;
 
     for (;;){
-    	ILI9488_drawPixel(x0, y0, color);
+    	LCD_drawPixel(x0, y0, color);
 
         if ((x0==x1)&&(y0==y1)) break;
         int e2 = 2 * error;
@@ -1353,13 +1713,13 @@ void LCD_setTextWrap(int16_t mode)
 
 
 // draw a rectangle
-void ILI9488_drawRect(int16_t x, int16_t y, int16_t w, int16_t h,
+void LCD_drawRect(int16_t x, int16_t y, int16_t w, int16_t h,
   uint16_t color) {
 
-	ILI9488_drawFastHLine(x, y, w, color) ;
-	ILI9488_drawFastHLine(x, y+h, w, color) ;
-	ILI9488_drawFastVLine(x, y, h, color) ;
-	ILI9488_drawFastVLine(x+w, y, h, color) ;
+	LCD_drawFastHLine(x, y, w, color) ;
+	LCD_drawFastHLine(x, y+h, w, color) ;
+	LCD_drawFastVLine(x, y, h, color) ;
+	LCD_drawFastVLine(x+w, y, h, color) ;
 }
 
 
@@ -1374,10 +1734,10 @@ int LCD_drawCircle(int center_x, int center_y, int radius, int color)
     int x = 0;
     int y = radius;
 
-    ILI9488_drawPixel(center_x  , center_y+radius, color);
-    ILI9488_drawPixel(center_x  , center_y-radius, color);
-    ILI9488_drawPixel(center_x+radius, center_y, color );
-    ILI9488_drawPixel(center_x-radius, center_y, color );
+    LCD_drawPixel(center_x  , center_y+radius, color);
+    LCD_drawPixel(center_x  , center_y-radius, color);
+    LCD_drawPixel(center_x+radius, center_y, color );
+    LCD_drawPixel(center_x-radius, center_y, color );
 
     while (x<y)
     {
@@ -1391,14 +1751,14 @@ int LCD_drawCircle(int center_x, int center_y, int radius, int color)
         ddF_x += 2;
         f += ddF_x;
 
-        ILI9488_drawPixel(center_x + x, center_y + y, color );
-        ILI9488_drawPixel(center_x - x, center_y + y, color );
-        ILI9488_drawPixel(center_x + x, center_y - y, color );
-        ILI9488_drawPixel(center_x - x, center_y - y, color );
-        ILI9488_drawPixel(center_x + y, center_y + x, color );
-        ILI9488_drawPixel(center_x - y, center_y + x, color );
-        ILI9488_drawPixel(center_x + y, center_y - x, color );
-        ILI9488_drawPixel(center_x - y, center_y - x, color );
+        LCD_drawPixel(center_x + x, center_y + y, color );
+        LCD_drawPixel(center_x - x, center_y + y, color );
+        LCD_drawPixel(center_x + x, center_y - y, color );
+        LCD_drawPixel(center_x - x, center_y - y, color );
+        LCD_drawPixel(center_x + y, center_y + x, color );
+        LCD_drawPixel(center_x - y, center_y + x, color );
+        LCD_drawPixel(center_x + y, center_y - x, color );
+        LCD_drawPixel(center_x - y, center_y - x, color );
     }
     return result;
 }
@@ -1428,8 +1788,8 @@ int LCD_drawCircle2(int center_x, int center_y, int radius, int color) {
     	if(l>0)
     	{
          //LCD_Fill_Fast(center_x-l, y, center_x+l+1, y+1, color);
-    		ILI9488_drawPixel(center_x-l, y, color);
-    		ILI9488_drawPixel(center_x+l, y, color);
+    		LCD_drawPixel(center_x-l, y, color);
+    		LCD_drawPixel(center_x+l, y, color);
     	}
     	rsin -- ;
     }
@@ -1444,10 +1804,10 @@ int LCD_drawCircle2(int center_x, int center_y, int radius, int color) {
 int LCD_drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t radius,
   uint16_t color) {
 
-	ILI9488_drawFastHLine(x+radius, y, w-(radius<<1)+1, color) ;
-	ILI9488_drawFastHLine(x+radius, y+h-1, w-(radius<<1)+1, color) ;
-	ILI9488_drawFastVLine(x, y+radius, h-(radius<<1)+1, color) ;
-	ILI9488_drawFastVLine(x+w-1, y+radius, h-(radius<<1)+1, color) ;
+	LCD_drawFastHLine(x+radius, y, w-(radius<<1)+1, color) ;
+	LCD_drawFastHLine(x+radius, y+h-1, w-(radius<<1)+1, color) ;
+	LCD_drawFastVLine(x, y+radius, h-(radius<<1)+1, color) ;
+	LCD_drawFastVLine(x+w-1, y+radius, h-(radius<<1)+1, color) ;
 
     int result = 0 ;
 
@@ -1462,10 +1822,10 @@ int LCD_drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t radius
     x = 0;
     y = radius;
 
-    /*ILI9488_drawPixel(center_x2  , center_y2+radius, color);
-    ILI9488_drawPixel(center_x1  , center_y1-radius, color);
-    ILI9488_drawPixel(center_x2+radius, center_y1, color );
-    ILI9488_drawPixel(center_x1-radius, center_y2, color );*/
+    /*LCD_drawPixel(center_x2  , center_y2+radius, color);
+    LCD_drawPixel(center_x1  , center_y1-radius, color);
+    LCD_drawPixel(center_x2+radius, center_y1, color );
+    LCD_drawPixel(center_x1-radius, center_y2, color );*/
 
     while (x<y)
     {
@@ -1479,18 +1839,18 @@ int LCD_drawRoundRect(int16_t x, int16_t y, int16_t w, int16_t h, int16_t radius
         ddF_x += 2;
         f += ddF_x;
 
-        //color = ILI9488_GREEN ;
+        //color = LCD_GREEN ;
 
-        ILI9488_drawPixel(center_x2 + x, center_y2 + y, color );
-        ILI9488_drawPixel(center_x1 - x, center_y2 + y, color );
-        ILI9488_drawPixel(center_x2 + x, center_y1 - y, color );
-        ILI9488_drawPixel(center_x1 - x, center_y1 - y, color );
+        LCD_drawPixel(center_x2 + x, center_y2 + y, color );
+        LCD_drawPixel(center_x1 - x, center_y2 + y, color );
+        LCD_drawPixel(center_x2 + x, center_y1 - y, color );
+        LCD_drawPixel(center_x1 - x, center_y1 - y, color );
 
-        //color = ILI9488_YELLOW ;
-        ILI9488_drawPixel(center_x2 + y, center_y2 + x, color );
-        ILI9488_drawPixel(center_x1 - y, center_y2 + x, color );
-        ILI9488_drawPixel(center_x2 + y, center_y1 - x, color );
-        ILI9488_drawPixel(center_x1 - y, center_y1 - x, color );
+        //color = LCD_YELLOW ;
+        LCD_drawPixel(center_x2 + y, center_y2 + x, color );
+        LCD_drawPixel(center_x1 - y, center_y2 + x, color );
+        LCD_drawPixel(center_x2 + y, center_y1 - x, color );
+        LCD_drawPixel(center_x1 - y, center_y1 - x, color );
     }
     return result;
 }
@@ -1566,7 +1926,7 @@ void LCD_DetectLineArea (int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
     int error = dx + dy;
 
     for (;;){
-    	//ILI9488_drawPixel(x0, y0, color);
+    	//LCD_drawPixel(x0, y0, color);
     	if((y0<_height)&&(y0>=0))
     	{
     		if(MinX[y0]>x0) MinX[y0] = x0 ;
@@ -1761,8 +2121,15 @@ int SetFont (uint8_t ifont)
 
 int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *name)
 {
-	ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
-	LCD_WR_REG(ILI9488_RAMRD);
+	LCD_setAddrWindow(x, y, x+w-1, y+h-1);
+#ifdef	LCD_ILI9488H_TYPE
+	LCD_WR_REG(ILI9488H_RAMRD);
+#else
+	#ifdef	LCD_NT35510_TYPE
+	LCD_WR_REG(NT35510_RAMRD);
+	//LCD_WR_DATA8(0) ;
+	#endif
+#endif
 
 	  FIL File;
 	  FATFS fatfs;
@@ -1784,13 +2151,34 @@ int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *name)
 
 	  char buffer[3] ;
 
+	  lcd_SET_BUS_INPUT();
+	  Delay_Us(1) ;
+	  LCD_CS_Clr();
+	  Delay_Us(1) ;
+
+#ifdef	LCD_NT35510_TYPE
+	  LCD_Read_Bus();
+#endif
+
 	  for(int i=0;i<h*w;i++)
 	  {
+#ifdef	LCD_ILI9488H_TYPE
 		  buffer[0] = LCD_Read_Bus();
 		  buffer[1] = LCD_Read_Bus();
 		  buffer[2] = LCD_Read_Bus();
+#else
+	#ifdef	LCD_NT35510_TYPE
+		  buffer[0] = LCD_Read_Bus();
+		  buffer[1] = LCD_Read_Bus();
+		  buffer[2] = LCD_Read_Bus();
+	#endif
+#endif
 		  f_write(&File, buffer, 3, &uint_result);
 	  }
+
+	  LCD_CS_Set();
+	  lcd_SET_BUS_OUTPUT();  // chanded 9-11-2025
+
 
 	  fres = f_close(&File);
 	  //if(fres != FR_OK) return -1 ;
@@ -1825,16 +2213,24 @@ int LCD_putRect(int16_t x, int16_t y, char *name)
 	  f_read(&File, &w, sizeof(int16_t), &uint_result);
 	  f_read(&File, &h, sizeof(int16_t), &uint_result);
 
-	  ILI9488_setAddrWindow(x, y, x+w-1, y+h-1);
+	  LCD_setAddrWindow(x, y, x+w-1, y+h-1);
 
 	  char buffer[3] ;
 
 	  for(int i=0;i<h*w;i++)
 	  {
 		  f_read(&File, buffer, 3, &uint_result);
+#ifdef	LCD_ILI9488H_TYPE
 		  LCD_Writ_Bus(buffer[2]);
 		  LCD_Writ_Bus(buffer[1]);
 		  LCD_Writ_Bus(buffer[0]);
+#else
+	#ifdef	LCD_NT35510_TYPE
+		  LCD_Writ_Bus(buffer[0]);
+		  LCD_Writ_Bus(buffer[1]);
+		  LCD_Writ_Bus(buffer[2]);
+	#endif
+#endif
 	  }
 
 	  fres = f_close(&File);

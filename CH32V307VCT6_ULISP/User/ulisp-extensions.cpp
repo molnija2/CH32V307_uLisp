@@ -86,7 +86,7 @@ object *fn_touch_press (object *args, object *env) {
 #ifdef touchscreen_support
 
 
-  return  touch_Pressed()  ? tee : nil;
+  return  touch_Pressed()  ? nil : tee;
 #else
   return nil ;
 #endif
@@ -370,8 +370,8 @@ const char string_kbhit[] = "kbhit" ;
 
 #ifdef touchscreen_support
 const char stringtouch_press[] = "touch-press";
-const char stringtouch_x[] = "touch-x";
-const char stringtouch_y[] = "touch-y";
+const char stringtouch_x[] = "touch-x-raw";
+const char stringtouch_y[] = "touch-y-raw";
 //const char stringtouch_setcal[] = "touch-setcal";
 //const char stringtouch_calibrate[] = "touch-calibrate";
 //const char stringtouch_printcal[] = "touch-printcal";

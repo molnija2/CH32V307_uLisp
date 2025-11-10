@@ -41,7 +41,7 @@
 #define lisplibrary
 
 //#define assemblerlist
-#define lineeditor
+//#define lineeditor
 #define vt100
 #define extensions
 

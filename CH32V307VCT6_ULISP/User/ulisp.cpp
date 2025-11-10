@@ -2465,7 +2465,9 @@ void serialend (int address) {
 int   LCD_Read_Bus() ;
 
 #ifdef gfxsupport
-inline int gfxread () {  return LCD_Read_Bus(); }
+void lcd_SET_BUS_INPUT();
+void lcd_SET_BUS_OUTPUT();
+inline int gfxread () { lcd_SET_BUS_INPUT(); int i = LCD_Read_Bus(); lcd_SET_BUS_OUTPUT(); return i; }
 #endif
 
 
@@ -6466,7 +6468,7 @@ object *fn_drawpixel (object *args, object *env) {
   #ifdef gfxsupport
   uint16_t colour = COLOR_WHITE;
   if (cddr(args) != NULL) colour = checkinteger(third(args));
-  ILI9488_drawPixel(checkinteger(first(args)), checkinteger(second(args)), colour);
+  LCD_drawPixel(checkinteger(first(args)), checkinteger(second(args)), colour);
   #else
   (void) args;
   #endif
@@ -6501,7 +6503,7 @@ object *fn_drawrect (object *args, object *env) {
   uint16_t params[4], colour = COLOR_WHITE;
   for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  ILI9488_drawRect(params[0], params[1], params[2], params[3], colour);
+  LCD_drawRect(params[0], params[1], params[2], params[3], colour);
   #else
   (void) args;
   #endif
@@ -6523,7 +6525,7 @@ object *fn_fillrect (object *args, object *env) {
   uint16_t params[4], colour = COLOR_WHITE;
   for (int i=0; i<4; i++) { params[i] = checkinteger(car(args)); args = cdr(args); }
   if (args != NULL) colour = checkinteger(car(args));
-  ILI9488_fillRect(params[0], params[1], params[2], params[3], colour);
+  LCD_fillRect(params[0], params[1], params[2], params[3], colour);
   #else
   (void) args;
   #endif
@@ -6749,7 +6751,7 @@ object *fn_fillscreen (object *args, object *env) {
   #ifdef gfxsupport
   uint16_t colour = COLOR_BLACK;
   if (args != NULL) colour = checkinteger(first(args));
-  ILI9488_fillScreen(colour); //tcp_fillScreen(colour);
+  LCD_fillScreen(colour); //tcp_fillScreen(colour);
   #else
   (void) args;
   #endif
@@ -6764,7 +6766,7 @@ object *fn_setrotation (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
   int r = checkinteger(first(args)) ;
-  ILI9488_setRotation(r);
+  LCD_setRotation(r);
   #ifdef touchscreen_support
     TS_setRotation(r) ;
   #endif
@@ -6781,7 +6783,7 @@ object *fn_setrotation (object *args, object *env) {
 object *fn_invertdisplay (object *args, object *env) {
   (void) env;
   #ifdef gfxsupport
-  ILI9488_invertDisplay(first(args) != NULL);
+  LCD_invertDisplay(first(args) != NULL);
   #else
   (void) args;
   #endif
@@ -8847,7 +8849,7 @@ void initenv () {
 void initgfx () {
 
 #ifdef gfxsupport
-	ILI9488_begin() ;
+	LCD_begin() ;
 	#ifdef 	graphics_package
 		//if(LoadFont((char*)"/FONTS/NIN22H14.BIN", 1))
 		{

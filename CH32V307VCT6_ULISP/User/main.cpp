@@ -597,7 +597,7 @@ void freemem(uintptr_t addr)
 }
 
 
-#define UART_BOUDRATE		9600//115200
+#define UART_BOUDRATE		115200
 
 
 /*********************************************************************
@@ -647,7 +647,7 @@ int main(void)
 
     StartWaitUSART() ;
 
-//    ILI9488_begin() ;
+    //LCD_begin() ;
 
 	setup();
 	loop();
