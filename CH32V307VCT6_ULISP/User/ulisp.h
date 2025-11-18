@@ -214,7 +214,7 @@ typedef struct {
 } tbl_entry_t;
 
 typedef int (*gfun_t)();
-typedef void (*pfun_t)(char);
+typedef void (*pfun_t)(int);
 
 enum builtins: builtin_t { NIL, TEE, NOTHING, OPTIONAL, FEATURES, INITIALELEMENT, ELEMENTTYPE, TEST, COLONA, COLONB,
 COLONC, BIT, AMPREST, LAMBDA, LET, LETSTAR, CLOSURE, PSTAR, QUOTE, DEFUN, DEFVAR, EQ, CAR, FIRST, CDR,
@@ -346,7 +346,7 @@ int stringlength (object *form) ;
 object **getcharplace (object *string, int n, int *shift) ;
 uint8_t nthchar (object *string, int n) ;
 int gstr () ;
-void pstr (char c) ;
+void pstr (int c) ;
 object *lispstring (char *s) ;
 int stringcompare (object *args, bool lt, bool gt, bool eq) ;
 object *documentation (object *arg, object *env) ;
@@ -624,7 +624,7 @@ bool colonp (symbol_t name) ;
 bool keywordp (object *obj) ;
 void backtrace (symbol_t name) ;
 object *eval (object *form, object *env) ;
-void pserial (char c) ;
+void pserial (int c) ;
 void pcharacter (uint8_t c, pfun_t pfun) ;
 void pstring (char *s, pfun_t pfun) ;
 void plispstring (object *form, pfun_t pfun) ;

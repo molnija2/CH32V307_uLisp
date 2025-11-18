@@ -43,4 +43,6 @@ void digitalWrite(int pin, int mode);
 unsigned int analogRead(int pin) ;
 int analogWrite(int pin, uint16_t Data);
 
+int SPI_beginTransaction(unsigned long speed, uint8_t bitorder, uint8_t mode) ;
+
 #endif /* USER_BOARD_PINS_H_ */

@@ -5,7 +5,7 @@
  *      Author: sap
  */
 
-
+#include "ch32v30x_rcc.h"
 #include "board_pins.h"
 
 
@@ -227,4 +227,62 @@ void checkanalogread (int pin) {
 
 void checkanalogwrite (int pin) {
 
+}
+
+static const uint16_t spi_bitorder[2] = { SPI_FirstBit_LSB, SPI_FirstBit_MSB} ;
+static const uint16_t spi_mode[4] = { SPI_CPOL_High|(SPI_CPHA_2Edge<<8),
+		SPI_CPOL_Low|(SPI_CPHA_2Edge<<8),
+		SPI_CPOL_High|(SPI_CPHA_1Edge<<8),
+		SPI_CPOL_Low|(SPI_CPHA_1Edge<<8) } ;
+
+int SPI_beginTransaction( unsigned long speed, uint8_t bitorder, uint8_t mode) {
+
+    GPIO_InitTypeDef GPIO_InitStructure ;
+    SPI_InitTypeDef  SPI_InitStructure ;
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_AFIO|RCC_APB2Periph_SPI1, ENABLE);
+    //RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI1, ENABLE);
+
+
+    /* SPI_CLK */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* SPI_MISO */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    /* SPI_MOSI */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    RCC_ClocksTypeDef RCC_ClocksStatus;
+    RCC_GetClocksFreq(&RCC_ClocksStatus);
+    unsigned int apbclock = RCC_ClocksStatus.PCLK1_Frequency;
+    int presc = -1 ;
+    do{
+    	apbclock <<=1 ;
+    	presc += 1 ;
+    }  while((apbclock>speed)&&(presc<SPI_BaudRatePrescaler_256)) ;
+
+    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+    SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
+    SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b ;
+    SPI_InitStructure.SPI_CPOL = spi_mode[mode]&0xff ;
+    SPI_InitStructure.SPI_CPHA = spi_mode[mode]>>8 ;
+    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
+    SPI_InitStructure.SPI_BaudRatePrescaler = presc ; /* APB1_CLK (72MHz) */
+    SPI_InitStructure.SPI_FirstBit = spi_bitorder[bitorder];
+    SPI_InitStructure.SPI_CRCPolynomial = 7;
+    SPI_Init(SPI1, &SPI_InitStructure);
+    //GPIO_PinRemapConfig(GPIO_PartialRemap1_SPI1, ENABLE);
+
+    SPI_Cmd(SPI1, ENABLE);
+
+	return 0 ;
 }

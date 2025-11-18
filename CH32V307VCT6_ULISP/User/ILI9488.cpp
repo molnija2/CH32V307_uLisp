@@ -169,7 +169,7 @@ void lcd_GPIO_init(void)
 void LCD_Writ_Bus(uint8_t byte)
 {
 	//uint16_t data = byte ;
-    LCD_CS_Clr() ;
+    //LCD_CS_Clr() ;
  	GPIO_ResetBits(GPIOC, DEF_GPIO_DATA8);
 	GPIO_SetBits(GPIOC, byte);
     LCD_WR_Clr() ;
@@ -179,11 +179,13 @@ void LCD_Writ_Bus(uint8_t byte)
 
 
 
-void LCD_WR_DATA8(uint8_t byte)
+/*void LCD_WR_DATA8(uint8_t byte)
 {
-    LCD_DC_Set() ;
+    //LCD_DC_Set() ;
     LCD_Writ_Bus(byte) ;
 }
+*/
+#define LCD_WR_DATA8(a)    LCD_Writ_Bus(a)
 
 
 void LCD_WR_DATA16(uint16_t data)
@@ -192,13 +194,14 @@ void LCD_WR_DATA16(uint16_t data)
     LCD_DC_Set() ;
     LCD_Writ_Bus(data>>8) ;
     LCD_Writ_Bus(data&0xff) ;
+    //LCD_DC_Set() ;
 }
 
 
 void LCD_WR_REG(uint16_t byte)
 {
     LCD_DC_Clr() ;
-
+    LCD_CS_Clr() ;
 #ifdef	LCD_ILI9488H_TYPE
     LCD_Writ_Bus(byte) ;
 #else
@@ -1578,6 +1581,7 @@ void LCD_drawChar (u8 asciiCode)
     //	LCD_Fill_Fast(iCurrentX, iCurrentY, iCurrentX+charW, iCurrentY+charH, iCurrentBkColor);
 
     LCD_setAddrWindow(iCurrentX, iCurrentY, iCurrentX+charW-1, iCurrentY+charH-1);
+    LCD_CS_Clr() ;
 
     if(FontCurrent == FontInfo ) asciiCode -=0x20 ;
 
@@ -2214,6 +2218,8 @@ int LCD_putRect(int16_t x, int16_t y, char *name)
 	  f_read(&File, &h, sizeof(int16_t), &uint_result);
 
 	  LCD_setAddrWindow(x, y, x+w-1, y+h-1);
+
+	  LCD_CS_Clr() ;
 
 	  char buffer[3] ;
 

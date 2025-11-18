@@ -156,9 +156,9 @@ void SRAM_init()
 	FSMC_NORSRAMInitStruct.FSMC_WriteTimingStruct = &FSMC_ReadWriteTimingStruct ;
 
 	FSMC_ReadWriteTimingStruct.FSMC_AccessMode = FSMC_AccessMode_A ;
-	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 2 ; //14;//14 ; //14 ; //11
-	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 9 ; //10;//7 ; //14 ; //10
-	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 4 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
+	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 2;//2 ; //14;//14 ; //14 ; //11
+	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 2;//9 ; //10;//7 ; //14 ; //10
+	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 4;//4 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
 	FSMC_ReadWriteTimingStruct.FSMC_BusTurnAroundDuration = 0 ;
 
 

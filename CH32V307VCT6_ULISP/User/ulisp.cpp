@@ -306,6 +306,7 @@ void initworkspace () {
     object *obj = &Workspace[i];
     printf("Workspace[%d] = %08x, CAR %08x, CDR %08x\n", i, obj, car(obj), cdr(obj)) ;
   }*/
+  return ;
 }
 
 /*
@@ -1821,7 +1822,7 @@ int gstr () {
 /*
   pstr - prints a character to a string stream
 */
-void pstr (char c) {
+void pstr (int c) {
   buildstring(c, &GlobalStringTail);
 }
 
@@ -2390,15 +2391,17 @@ object *dobody (object *args, object *env, bool star) {
 #ifdef ARDUINO_ADAFRUIT_QTPY_ESP32S2
 #endif
 
+SPI_TypeDef* SPIx ;
+
 int spiread () {
-	SPI_I2S_SendData(SPI2,0);
-	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
-	return SPI_I2S_ReceiveData(SPI2) ;
+	SPI_I2S_SendData(SPI1,0);
+	while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET);
+	return SPI_I2S_ReceiveData(SPI3) ;
 }
 
-inline void spiwrite (char c) {
-	SPI_I2S_SendData(SPI2,c);
-	while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
+inline void spiwrite (int c) {
+	SPI_I2S_SendData(SPI1,c);
+	while(SPI_I2S_GetFlagStatus(SPI3, SPI_I2S_FLAG_TXE) == RESET);
 }
 
 
@@ -2509,7 +2512,7 @@ gfun_t gstreamfun (object *args) {
 void LCD_Writ_Bus(uint8_t byte);
 extern u8 send_data_mode ;
 
-inline void gfxwrite (char c) {
+inline void gfxwrite (int c) {
     /*if(send_data_mode) LCD_Writ_Bus(c) ;
     else*/
     	LCD_drawChar(c);
@@ -2600,7 +2603,7 @@ const int PPWIDTH = 80;
 const int GFXPPWIDTH = 52; // 320 pixel wide screen
 int ppwidth = PPWIDTH;
 
-void pcount (char c) {
+void pcount (int c) {
   if (c == '\n') PrintCount++;
   PrintCount++;
 }
@@ -3287,6 +3290,17 @@ object *sp_withi2c (object *args, object *env) {
   return nil;
 }
 
+
+#define LSBFIRST	0
+#define MSBFIRST	1
+
+#define SPI_MODE0	0
+#define SPI_MODE1	1
+#define SPI_MODE2	2
+#define SPI_MODE3	3
+
+
+
 /*
   (with-spi (str pin [clock] [bitorder] [mode]) form*)
   Evaluates the forms with str bound to an spi-stream.
@@ -3299,8 +3313,32 @@ object *sp_withspi (object *args, object *env) {
   params = cdr(params);
   if (params == NULL) error2(nostream);
   int pin = checkinteger(eval(car(params), env));
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+  int clock = 4000, mode = SPI_MODE0; // Defaults
+  int bitorder = MSBFIRST;
+  if (params != NULL) {
+    clock = checkinteger(eval(car(params), env));
+    params = cdr(params);
+    if (params != NULL) {
+      bitorder = (checkinteger(eval(car(params), env)) == 0) ? LSBFIRST : MSBFIRST;
+      params = cdr(params);
+      if (params != NULL) {
+        int modeval = checkinteger(eval(car(params), env));
+        mode = (modeval == 3) ? SPI_MODE3 : (modeval == 2) ? SPI_MODE2 : (modeval == 1) ? SPI_MODE1 : SPI_MODE0;
+      }
+    }
+  }
+
   object *pair = cons(var, stream(SPISTREAM, pin));
   push(pair,env);
+  //SPI.begin();
+  SPI_beginTransaction((unsigned long)clock*1000, bitorder, mode);
+  digitalWrite(pin, LOW);
+  object *forms = cdr(args);
+  object *result = eval(tf_progn(forms,env), env);
+  digitalWrite(pin, HIGH);
+  //SPI.endTransaction();
   return nil;
 }
 
@@ -8212,7 +8250,7 @@ if (form->type == CODE) error2("can't evaluate CODE header");
 /*
   pserial - prints a character to the serial port
 */
-void pserial (char c) {
+void pserial (int c) {
 	void putchar0(uint8_t c) ;
   LastPrint = c;
 
