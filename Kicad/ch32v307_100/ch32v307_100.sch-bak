@@ -2459,7 +2459,7 @@ LCD_RS
 Text Label 10075 5900 3    50   ~ 0
 LCD_WR
 Text Label 9975 5900 3    50   ~ 0
-RD
+LCD_RD
 Text Label 10575 5900 3    50   ~ 0
 VDD_TFT
 Text Label 9875 5900 3    50   ~ 0

@@ -2467,7 +2467,7 @@ SPI_SDA
 Text Label 9775 5900 3    50   ~ 0
 SPI_SDO
 Text Label 9675 5900 3    50   ~ 0
-RESET
+LCD_RST
 Text Label 9575 5900 3    50   ~ 0
 GND
 Text Label 9475 5900 3    50   ~ 0
