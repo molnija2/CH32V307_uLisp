@@ -2453,13 +2453,13 @@ GND
 Text Label 10375 5900 3    50   ~ 0
 FMARK
 Text Label 10275 5900 3    50   ~ 0
-CS(CS)
+LCD_CS
 Text Label 10175 5900 3    50   ~ 0
-RS(A0)
+LCD_RS
 Text Label 10075 5900 3    50   ~ 0
-WR(SCL)
+LCD_WR
 Text Label 9975 5900 3    50   ~ 0
-RD
+LCD_RD
 Text Label 10575 5900 3    50   ~ 0
 VDD_TFT
 Text Label 9875 5900 3    50   ~ 0
