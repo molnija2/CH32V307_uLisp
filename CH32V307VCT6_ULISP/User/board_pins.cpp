@@ -116,7 +116,7 @@ unsigned int digitalRead(int pin)
 {
 	pindesc_t *pind = (pindesc_t*)(&pin_desc[pin])  ;
 
-	return GPIO_ReadInputDataBit(GPIOx[pind->iPort], pind->iBit) ;
+	return GPIO_ReadInputDataBit(GPIOx[pind->iPort], 1<<pind->iBit) ;
 }
 
 
@@ -124,9 +124,9 @@ void digitalWrite(int pin, int mode)
 {
 	pindesc_t *pind = (pindesc_t*)(&pin_desc[pin])  ;
 	if(mode)
-		GPIO_SetBits(GPIOx[pind->iPort], pind->iBit);
+		GPIO_SetBits(GPIOx[pind->iPort], 1<<pind->iBit);
 	else
-		GPIO_ResetBits(GPIOx[pind->iPort], pind->iBit);
+		GPIO_ResetBits(GPIOx[pind->iPort], 1<<pind->iBit);
 }
 
 

@@ -61,8 +61,12 @@ buildstring  - changed for x86 machines
 
 // Lisp Library
 const char LispLibrary[] = R"lisplibrary("
-"(ignore-errors (with-sd-card (s "BOOT.L") (eval (read s))))",
+"(ignore-errors (eval (with-sd-card  (s "BOOT.L" 0)  (read s))))",
 ")lisplibrary";
+
+//"(ignore-errors (eval (with-sd-card  (s "BOOT.L")  (read s))))",
+
+//"(ignore-errors (let ((lst nil)) (with-sd-card  (s "BOOT.L") (setq (read s))) (eval lst)))",
 
 /*"(defun load-program (filename)
  (with-sd-card (s filename) (read s)))",
@@ -2817,6 +2821,8 @@ object *sp_push (object *args, object *env) {
   return *loc;
 }
 
+
+
 /*
   (pop place)
   Modifies the value of place, which should be a non-nil list, to remove its first item,
@@ -3459,11 +3465,11 @@ const char docASM[] = "(defcode name (parameters) form*)\n";
 
 // Assembler
 
-#define CODESIZE 512                    /* Bytes */
+#define CODESIZE 1024                    /* Bytes */
 
 // Code marker stores start and end of code block
 #define startblock(x)      ((x->integer) & 0xFFFF)
-#define endblock(x)        ((x->integer) >> 16 & 0xFFFF)
+#define endblock(x)        ((x->integer) / 65536)
 typedef int (*intfn_ptr_type)(int w, int x, int y, int z);
 
 uint8_t MyCode[CODESIZE] WORDALIGNED;
@@ -3479,14 +3485,13 @@ object *call (int entry, int nargs, object *args, object *env) {
     else param[i] = (uintptr_t)arg;
     args = cdr(args);
   }
-  asm("fence.i");
+  //asm("fence.i");
   int w = ((intfn_ptr_type)&MyCode[entry])(param[0], param[1], param[2], param[3]);
   return number(w);
 #else
   return nil;
 #endif
 }
-
 
 void putcode (object *arg, int origin, int pc) {
 #if defined(CODESIZE)
@@ -3558,8 +3563,17 @@ object *codehead (int entry) {
   return ptr;
 }
 
+
+
+
+/*
+  (defcode name (parameters) form*)
+  Creates a machine-code function called name from a series of 16-bit integers given in the body of the form.
+  These are written into RAM, and can be executed by calling the function in the same way as a normal Lisp function.
+*/
 object *sp_defcode (object *args, object *env) {
   setflag(NOESC);
+  int codesize ;
   object *var = first(args);
   object *params = second(args);
   if (!symbolp(var)) error("not a symbol", var);
@@ -3591,8 +3605,9 @@ object *sp_defcode (object *args, object *env) {
   }
 
   // First pass
-  int origin = 0;
-  int codesize = assemble(1, origin, cdr(args), env, pcpair);
+  int origin WORDALIGNED ;
+  origin = 0;
+  codesize = assemble(1, origin, cdr(args), env, pcpair);
 
   // See if it will fit
   object *globals = GlobalEnv;
@@ -3609,8 +3624,8 @@ object *sp_defcode (object *args, object *env) {
   if (codesize > CODESIZE) error("not enough room for code", var);
 
   // Compact the code block, removing gaps
-  origin = 0;
-  object *block;
+  origin = 0 ;
+  object *block WORDALIGNED;
   int smallest;
 
   do {
@@ -3631,7 +3646,12 @@ object *sp_defcode (object *args, object *env) {
     }
 
     // Compact fragmentation if necessary
-    if (smallest == origin) origin = endblock(block); // No gap
+    if (smallest == origin)
+    {
+    	origin = endblock(block); // No gap
+    	//origin = origin / 65536 ;
+    	//int i = origin + 1 ;
+    }
     else if (smallest < CODESIZE) { // Slide block down
       int target = origin;
       for (int i=startblock(block); i<endblock(block); i++) {
@@ -3655,6 +3675,7 @@ object *sp_defcode (object *args, object *env) {
   return var;
 }
 
+// Tail-recursive forms
 
 
 /*
@@ -3747,6 +3768,7 @@ object *tf_and (object *args, object *env) {
   }
   return car(args);
 }
+
 
 // Core functions
 
@@ -4492,8 +4514,21 @@ object *fn_abs (object *args, object *env) {
 object *fn_random (object *args, object *env) {
   (void) env;
   object *arg = first(args);
-  if (integerp(arg)) return number(rand(/*arg->integer*/));
-  else if (floatp(arg)) return makefloat((sfloat_t)rand()/(sfloat_t)(RAND_MAX/(arg->single_float)));
+  if (integerp(arg))
+  {
+	  unsigned long int r, m ;
+	  r = random() ;
+	  m = RAND_MAX/arg->integer ; //RAND_MAX=2147483647
+	  r /= m ;
+	  return number(r);
+  }
+  else if (floatp(arg))
+  {
+	  float r = random(), m ;
+	  m = RAND_MAX/arg->single_float ;
+	  r /= m;
+	  return makefloat(r);
+  }
   else error(notanumber, arg);
   return nil;
 }
@@ -7123,8 +7158,9 @@ const char doc28[] = "(char string n)\n"
 const char doc29[] = "(string item)\n"
 "Converts its argument to a string.";
 const char doc30[] = "(pinmode pin mode)\n"
-//"Sets the input/output mode of an Arduino pin number, and returns nil.\n"
-"The mode parameter can be an integer, a keyword, or t or nil.";
+"Sets the input/output mode of an Arduino pin number, and returns nil."
+"\nMode 1-output 2-read 3-readPU 4-readPD 5-analogIN 6-analogOUT\n";
+//"The mode parameter can be an integer, a keyword, or t or nil.";
 const char doc31[] = "(digitalwrite pin state)\n"
 "Sets the state of the specified Arduino pin number.";
 const char doc32[] = "(analogread pin)\n"
@@ -7710,7 +7746,7 @@ const tbl_entry_t lookup_table[] = {
   { string60, tf_unless, 0117, doc60 },
   { string61, tf_case, 0117, doc61 },
   { string62, tf_and, 0107, doc62 },
-  { string63, fn_not, 0211, doc63 },
+  { string63, fn_not, 0211, NULL/*doc63*/ },
   { string64, fn_not, 0211, NULL },
   { string65, fn_cons, 0222, doc65 },
   { string66, fn_atom, 0211, doc66 },
@@ -7723,17 +7759,17 @@ const tbl_entry_t lookup_table[] = {
   { string73, fn_setfn, 0227, doc73 },
   { string74, fn_streamp, 0211, doc74 },
   { string75, fn_equal, 0222, doc75 },
-  /*{ string76, fn_caar, 0211, doc76 },
-  { string77, fn_cadr, 0211, doc77 },
+  { string76, fn_caar, 0211, NULL/*doc76*/ },
+  { string77, fn_cadr, 0211, NULL/*doc77*/ },
   { string78, fn_cadr, 0211, NULL },
-  { string79, fn_cdar, 0211, doc79 },
+  /*{ string79, fn_cdar, 0211, doc79 },
   { string80, fn_cddr, 0211, doc80 },
   { string81, fn_caaar, 0211, doc81 },
   { string82, fn_caadr, 0211, doc82 },
   { string83, fn_cadar, 0211, doc83 },
-  { string84, fn_caddr, 0211, doc84 },
+  { string84, fn_caddr, 0211, doc84 },*/
   { string85, fn_caddr, 0211, NULL },
-  { string86, fn_cdaar, 0211, doc86 },
+  /*{ string86, fn_cdaar, 0211, doc86 },
   { string87, fn_cdadr, 0211, doc87 },
   { string88, fn_cddar, 0211, doc88 },
   { string89, fn_cdddr, 0211, doc89 },*/
@@ -7762,7 +7798,7 @@ const tbl_entry_t lookup_table[] = {
   { string112, fn_rem, 0222, doc112 },
   { string113, fn_oneplus, 0211, doc113 },
   { string114, fn_oneminus, 0211, doc114 },
-  { string115, fn_abs, 0211, doc115 },
+  { string115, fn_abs, 0211, /*doc115*/NULL },
   { string116, fn_random, 0211, doc116 },
   { string117, fn_maxfn, 0217, doc117 },
   { string118, fn_minfn, 0217, doc118 },
@@ -7891,7 +7927,7 @@ const tbl_entry_t lookup_table[] = {
   { string239, fn_settextwrap, 0211, doc239 },
   { string240, fn_fillscreen, 0201, doc240 },
   { string241, fn_setrotation, 0211, doc241 },
-  { string242, fn_invertdisplay, 0211, doc242 },
+  { string242, fn_invertdisplay, 0211, /*doc242*/ NULL },
   { string243, (fn_ptr_type)LED_BUILTIN, 0, NULL },
   { string244, (fn_ptr_type)HIGH, DIGITALWRITE, NULL },
   { string245, (fn_ptr_type)LOW, DIGITALWRITE, NULL },
@@ -8402,6 +8438,21 @@ void pintbase (uint32_t i, uint8_t base, pfun_t pfun) {
   }
 }
 
+
+
+/*
+  pinthex4 - prints a four-digit hexadecimal number with leading zeros to the specified stream
+*/
+void printhex4 (int i, pfun_t pfun) {
+  int p = 0x1000;
+  for (int d=p; d>0; d=d/16) {
+    int j = i/d;
+    pfun((j<10) ? j+'0' : j + 'W');
+    i = i - j*d;
+  }
+  pfun(' ');
+}
+
 /*
   pmantissa - prints the mantissa of a floating-point number to the specified stream
 */
@@ -8431,6 +8482,8 @@ void pmantissa (sfloat_t f, pfun_t pfun) {
     mul = mul / 10;
   }
 }
+
+
 
 /*
   pfloat - prints a floating-point number to the specified stream
@@ -8936,6 +8989,8 @@ void setup () {
   InitArray2() ;  //  Change for ARRAY2
 #endif
 
+  //srand (millis());
+
   initworkspace();
   initenv();
   initsleep();
@@ -8969,7 +9024,7 @@ void DeleteWorkspace()
 void repl (object *env) {
    while (1) {
     //randomSeed(micros());
-    srand (time(NULL));
+    srand (/*time(NULL)*/millis());
 
     #ifdef printfreespace
     if (!tstflag(NOECHO)) gc(NULL, env);

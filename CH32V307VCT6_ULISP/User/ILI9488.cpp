@@ -53,6 +53,8 @@ static uint16_t iCurrentColor, iCurrentTextColor ;
 static uint16_t iCurrentBkColor ;
 static uint16_t _height, _width ;
 static uint8_t rotation, iTextWrap ;
+//static int scrollPos ;
+
 
 static const FONT_INFO	FontBasic = {8,DEF_CHAR_WIDTH,0,DEF_BasicFontDIR,"Basic", (uint8_t *)FONT_Basic} ;
 static FONT_INFO	FontInfo[DEF_FONTS_MAXNUMBER] ;
@@ -804,10 +806,11 @@ void LCD_begin (void)
 	lcd_SendDataN(gammaN,15);
 
 	CommonInit(Start_commands) ;
+
 #else
  #ifdef	LCD_NT35510_TYPE
 
-	Delay_Ms(10);
+	//Delay_Ms(10);
 	LCD_RES_Clr();
 	Delay_Ms(10);
 	LCD_RES_Set();
@@ -854,6 +857,7 @@ void LCD_begin (void)
   iFillAreaDetectMode = 0 ;
   iEscBegin = 0 ;
   iTextInv = 0 ;
+  //scrollPos = 0 ;
 
 
   LCD_fillScreen(LCD_BLUE) ;
@@ -875,7 +879,9 @@ void LCD_begin (void)
 void LCD_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea){
 
   if (hwSPI) spi_begin();
+
   LCD_WR_REG(0x33); // Vertical scroll definition
+  LCD_DC_Set();
   LCD_WR_DATA8(topFixedArea >> 8);
   LCD_WR_DATA8(topFixedArea);
   LCD_WR_DATA8((_height - topFixedArea - bottomFixedArea) >> 8);
@@ -884,9 +890,14 @@ void LCD_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea){
   LCD_WR_DATA8(bottomFixedArea);
   if (hwSPI) spi_end();
 }
+
+
+
 void LCD_scroll(uint16_t pixels){
   if (hwSPI) spi_begin();
+
   LCD_WR_REG(0x37); // Vertical scrolling start address
+  LCD_DC_Set();
   LCD_WR_DATA8(pixels >> 8);
   LCD_WR_DATA8(pixels);
   if (hwSPI) spi_end();
@@ -1130,6 +1141,7 @@ void LCD_drawFastHLine(int16_t x, int16_t y, int16_t w,
 }
 
 void LCD_fillScreen(uint16_t color) {
+
 	LCD_fillRect(0, 0,  _width, _height, color);
 	iCurrentBkColor = color ;
 }
@@ -1213,6 +1225,10 @@ void LCD_setRotation(uint8_t m) {
      _height = LCD_TFTWIDTH;
      break;
   }
+
+  	LCD_WR_REG(ILI9488H_NORON);
+	LCD_setScrollArea(0, _height) ;
+
   if (hwSPI) spi_end();
 }
 
@@ -1494,6 +1510,16 @@ void LCD_settextBkMode(uint8_t  mode)
 
 
 
+
+void Scroll(u8 charH)
+{
+	/*scrollPos -= charH ;
+	if(scrollPos<0) scrollPos -= _height ;
+
+	LCD_scroll(scrollPos) ;*/
+}
+
+
 static char TxtCmd[12] ;
 
 
@@ -1548,23 +1574,27 @@ void LCD_drawChar (u8 asciiCode)
     {
     	iCurrentX = 0 ;
     	iCurrentY += charH ;
-    	if((iCurrentY+charH)>=_height)
+    	if((iCurrentY+charH)>_height)
     	{
+    		//Scroll(charH) ;
+    		//iCurrentY -= charH ;
     		iCurrentY = 0 ;
     	}
-    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, bkcolor) ;
+    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH, bkcolor) ;
     }
 
     if(asciiCode=='\n')
     {
     	iCurrentX = 0 ;
     	iCurrentY += charH  ;
-    	if((iCurrentY+charH)>=_height)
+    	if((iCurrentY+charH)>_height)
     	{
+    		//Scroll(charH) ;
+    		//iCurrentY -= charH ;
     		iCurrentY = 0 ;
     		//LCD_fillScreen(iCurrentBkColor) ;
     	}
-    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH+2, bkcolor) ;
+    	LCD_Fill_Fast(iCurrentX, iCurrentY, _width, iCurrentY+charH, bkcolor) ;
     	return ;
     }
 
@@ -1581,6 +1611,7 @@ void LCD_drawChar (u8 asciiCode)
     //	LCD_Fill_Fast(iCurrentX, iCurrentY, iCurrentX+charW, iCurrentY+charH, iCurrentBkColor);
 
     LCD_setAddrWindow(iCurrentX, iCurrentY, iCurrentX+charW-1, iCurrentY+charH-1);
+
     LCD_CS_Clr() ;
 
     if(FontCurrent == FontInfo ) asciiCode -=0x20 ;
@@ -2131,7 +2162,6 @@ int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *name)
 #else
 	#ifdef	LCD_NT35510_TYPE
 	LCD_WR_REG(NT35510_RAMRD);
-	//LCD_WR_DATA8(0) ;
 	#endif
 #endif
 
@@ -2160,16 +2190,16 @@ int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *name)
 	  LCD_CS_Clr();
 	  Delay_Us(1) ;
 
-#ifdef	LCD_NT35510_TYPE
+
 	  LCD_Read_Bus();
-#endif
+
 
 	  for(int i=0;i<h*w;i++)
 	  {
 #ifdef	LCD_ILI9488H_TYPE
-		  buffer[0] = LCD_Read_Bus();
-		  buffer[1] = LCD_Read_Bus();
 		  buffer[2] = LCD_Read_Bus();
+		  buffer[1] = LCD_Read_Bus();
+		  buffer[0] = LCD_Read_Bus();
 #else
 	#ifdef	LCD_NT35510_TYPE
 		  buffer[0] = LCD_Read_Bus();
@@ -2183,12 +2213,9 @@ int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *name)
 	  LCD_CS_Set();
 	  lcd_SET_BUS_OUTPUT();  // chanded 9-11-2025
 
-
 	  fres = f_close(&File);
-	  //if(fres != FR_OK) return -1 ;
-
 	  fres =  f_unmount("");
-	  //if(fres != FR_OK) return -1 ;
+
 	  return 1 ;
 
 }
@@ -2227,9 +2254,9 @@ int LCD_putRect(int16_t x, int16_t y, char *name)
 	  {
 		  f_read(&File, buffer, 3, &uint_result);
 #ifdef	LCD_ILI9488H_TYPE
-		  LCD_Writ_Bus(buffer[2]);
-		  LCD_Writ_Bus(buffer[1]);
 		  LCD_Writ_Bus(buffer[0]);
+		  LCD_Writ_Bus(buffer[1]);
+		  LCD_Writ_Bus(buffer[2]);
 #else
 	#ifdef	LCD_NT35510_TYPE
 		  LCD_Writ_Bus(buffer[0]);
@@ -2240,10 +2267,8 @@ int LCD_putRect(int16_t x, int16_t y, char *name)
 	  }
 
 	  fres = f_close(&File);
-	  //if(fres != FR_OK) return -1 ;
-
 	  fres =  f_unmount("");
-	  //if(fres != FR_OK) return -1 ;
+
 	  return 1 ;
 }
 
@@ -2252,3 +2277,88 @@ void LCD_stop_send_data()
 {
 	send_data_mode = 0 ;
 }
+
+
+
+int LCD_getMaxScrX(){  return _width ; }
+int LCD_getMaxScrY(){  return _height ; }
+
+
+static char ScanLineBuffer[LCD_TFTHEIGHT*3] ;
+
+
+int LCD_getScanLine(int16_t y)
+{
+	LCD_setAddrWindow(0, y, _width, y+1);
+#ifdef	LCD_ILI9488H_TYPE
+	LCD_WR_REG(ILI9488H_RAMRD);
+#else
+	#ifdef	LCD_NT35510_TYPE
+	LCD_WR_REG(NT35510_RAMRD);
+	#endif
+#endif
+
+
+	  char *ScanLineBufferPtr = ScanLineBuffer ;
+
+	  lcd_SET_BUS_INPUT();
+
+	  LCD_CS_Clr();
+	  Delay_Us(1) ;
+
+	  LCD_Read_Bus();
+
+
+
+	  for(int i=0;i<_width;i++)
+	  {
+#ifdef	LCD_ILI9488H_TYPE
+		  ScanLineBufferPtr[2] = LCD_Read_Bus();
+		  ScanLineBufferPtr[1] = LCD_Read_Bus();
+		  ScanLineBufferPtr[0] = LCD_Read_Bus();
+#else
+	#ifdef	LCD_NT35510_TYPE
+		  ScanLineBufferPtr[0] = LCD_Read_Bus();
+		  ScanLineBufferPtr[1] = LCD_Read_Bus();
+		  ScanLineBufferPtr[2] = LCD_Read_Bus();
+	#endif
+#endif
+		  ScanLineBufferPtr += 3 ;
+	  }
+
+	  LCD_CS_Set();
+	  lcd_SET_BUS_OUTPUT();  // chanded 9-11-2025
+
+	  return 1 ;
+}
+
+int LCD_putScanLine(int16_t y)
+{
+
+	//send_data_mode = 1 ;
+	LCD_setAddrWindow(0, y, _width, y+1);
+
+	  LCD_CS_Clr() ;
+
+	  char *ScanLineBufferPtr = ScanLineBuffer ;
+
+	  for(int i=0;i<_width;i++)
+	  {
+
+#ifdef	LCD_ILI9488H_TYPE
+		  LCD_Writ_Bus(ScanLineBufferPtr[2]);
+		  LCD_Writ_Bus(ScanLineBufferPtr[1]);
+		  LCD_Writ_Bus(ScanLineBufferPtr[0]);
+#else
+	#ifdef	LCD_NT35510_TYPE
+		  LCD_Writ_Bus(ScanLineBufferPtr[0]);
+		  LCD_Writ_Bus(ScanLineBufferPtr[1]);
+		  LCD_Writ_Bus(ScanLineBufferPtr[2]);
+	#endif
+#endif
+		  ScanLineBufferPtr += 3 ;
+	  }
+
+	  return 1 ;
+}
+

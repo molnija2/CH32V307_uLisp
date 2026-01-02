@@ -363,6 +363,57 @@ object *fn_getfontinfo (object *args, object *env) {
 }
 
 
+object *fn_getscrmaxx (object *args, object *env) {
+  (void) env;
+  int w =  LCD_getMaxScrX() ;
+  return number(w);
+}
+
+
+object *fn_getscrmaxy (object *args, object *env) {
+  (void) env;
+  int h = LCD_getMaxScrY() ;
+  return number(h);
+}
+
+
+
+void freemem(uintptr_t addr) ;
+char *allocmem(int size) ;
+
+
+object *fn_allocmem (object *args, object *env) {
+  (void) env;
+  (void) args;
+
+  uintptr_t addr ;
+  int isize = checkinteger(first(args)) ;
+  if(isize>0)
+  {
+	  addr = (uintptr_t)(allocmem(isize)) ;
+	  return number(addr);
+  }
+
+
+  return nil;
+}
+
+
+object *fn_freemem (object *args, object *env) {
+  (void) env;
+  (void) args;
+
+  unsigned int iaddr = (unsigned int)checkinteger(first(args)) ;
+  if(iaddr != 0)
+  {
+	  freemem((uintptr_t)iaddr) ;
+	  return tee;
+  }
+
+  return nil;
+}
+
+
 
 // Symbol names
 const char stringnow[]  = "now";
@@ -401,6 +452,9 @@ const char string_getmaxy[] = "getmaxy" ;
 const char string_getscrmaxx[] = "getscrmaxx" ;
 const char string_getscrmaxy[] = "getscrmaxy" ;
 #endif
+
+const char string_allocmem[] = "allocmem";
+const char string_freemem[] = "freemem";
 
 
 
@@ -525,8 +579,8 @@ const tbl_entry_t lookup_table2[]  = {
 
 #ifdef graphics_package
     { string_kbhit, fn_kbhit, 0200, /*doc_kbhit*/NULL },
-    { string_loadfont, fn_loadfont, 0222, doc_loadfont },
-    { string_setfont, fn_setfont, 0211, doc_setfont },
+    { string_loadfont, fn_loadfont, 0222, /*doc_loadfont*/NULL },
+    { string_setfont, fn_setfont, 0211, /*doc_setfont*/NULL },
     { string_getfontheight, fn_getfontheight, 0200, /*doc_getfontheight*/NULL },
     { string_getfontwidth, fn_getfontwidth, 0200, /*doc_getfontwidth*/NULL },
 	{string_fillpolyinit, fn_fillpolyinit, 200, NULL},
@@ -547,11 +601,13 @@ const tbl_entry_t lookup_table2[]  = {
     { string_getx, fn_getx, 0200, doc_getx },
     { string_gety, fn_gety, 0200, doc_gety },
     { string_getmaxx, fn_getmaxx, 0200, doc_getmaxx },
-    { string_getmaxy, fn_getmaxy, 0200, doc_getmaxy },
-    { string_getscrmaxx, fn_getscrmaxx, 0200, doc_getscrmaxx },
-    { string_getscrmaxy, fn_getscrmaxy, 0200, doc_getscrmaxy },*/
+    { string_getmaxy, fn_getmaxy, 0200, doc_getmaxy },*/
+    { string_getscrmaxx, fn_getscrmaxx, 0200, NULL/*doc_getscrmaxx*/ },
+    { string_getscrmaxy, fn_getscrmaxy, 0200, NULL/*doc_getscrmaxy*/ },
 #endif
 
+    { string_allocmem, fn_allocmem, 0211, NULL },
+    { string_freemem, fn_freemem, 0211, NULL },
 
 
 #ifdef DEF_ARRAY2

@@ -13,7 +13,7 @@
 
 #ifdef BOARD_HAS_ExternalRAM
 #define Bank1_SRAM1_ADDR    ((u32)(0x60000000))
-#define DEF_ExternalRAM_SIZE	(524288)
+#define DEF_ExternalRAM_SIZE	(1048576)//(524288)
 #define DEF_ExternalRAM_WORKSPACE_SIZE	(DEF_ExternalRAM_SIZE/2)
 #endif
 
@@ -187,9 +187,9 @@ typedef struct sobject {
       union {
     	uintptr_t pointer ;
         symbol_t name;
-        int integer;
-        int chars; // For strings
-        float single_float;
+        int32_t integer;
+        chars_t chars; // For strings
+        sfloat_t single_float;
       };
     };
   };
@@ -661,7 +661,7 @@ void setup () ;
 void repl (object *env) ;
 void loop () ;
 void ulisperror () ;
-
+void printhex4 (int i, pfun_t pfun) ;
 void delay(int ms);
 //#define usleep(a)   Delay_Us(a) ;
 //#define sleep(a)   Delay_Ms(a) ;

@@ -121,7 +121,7 @@ typedef short int int16_t;
 
 
 
-#define DEF_USART_RX_SIZE	1024
+#define DEF_USART_RX_SIZE	2048
 #define DEF_TIMEOUT		3000
 
 

@@ -20,8 +20,8 @@
 
 #include <inttypes.h>
 
-//#define LCD_ILI9488H_TYPE
-#define LCD_NT35510_TYPE
+#define LCD_ILI9488H_TYPE
+//#define LCD_NT35510_TYPE
 
 
 #ifdef	LCD_ILI9488H_TYPE
@@ -208,8 +208,8 @@ typedef struct{
 
   void     LCD_begin(void);
   void     LCD_setAddrWindow(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1),
-  LCD_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea),
-  LCD_scroll(uint16_t pixels),
+		  LCD_setScrollArea(uint16_t topFixedArea, uint16_t bottomFixedArea),
+		  LCD_scroll(uint16_t pixels),
            pushColor(uint16_t color),
            pushColors(uint16_t *data, uint8_t len, uint8_t first),
 		   LCD_drawImage(const uint8_t* img, uint16_t x, uint16_t y, uint16_t w, uint16_t h),
@@ -261,6 +261,13 @@ typedef struct{
 
   int LCD_getRect(int16_t x, int16_t y, int16_t w, int16_t h, char *fname) ;
   int LCD_putRect(int16_t x, int16_t y, char *fname) ;
+
+  int LCD_getMaxScrX() ;
+  int LCD_getMaxScrY() ;
+
+  int LCD_getScanLine(int16_t y) ;
+  int LCD_putScanLine(int16_t y) ;
+
 
   /*
   uint16_t readcommand16(uint8_t);

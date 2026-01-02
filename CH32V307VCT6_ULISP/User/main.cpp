@@ -41,7 +41,7 @@
 /* Global define */
 #define Bank1_SRAM1_ADDR    ((u32)(0x60000000))
 
-#define DEF_ExternalRAM_SIZE	(524288)
+#define DEF_ExternalRAM_SIZE	(1048576)//(524288)
 #define DEF_LISP_WORKSPACE_SIZE	(DEF_ExternalRAM_SIZE/2)
 
 #define DEF_ALLOCMEM_ADDR	((u32)(Bank1_SRAM1_ADDR+DEF_LISP_WORKSPACE_SIZE))
@@ -156,9 +156,9 @@ void SRAM_init()
 	FSMC_NORSRAMInitStruct.FSMC_WriteTimingStruct = &FSMC_ReadWriteTimingStruct ;
 
 	FSMC_ReadWriteTimingStruct.FSMC_AccessMode = FSMC_AccessMode_A ;
-	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 2;//2 ; //14;//14 ; //14 ; //11
-	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 2;//9 ; //10;//7 ; //14 ; //10
-	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 4;//4 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
+	FSMC_ReadWriteTimingStruct.FSMC_AddressSetupTime = 2 ;//2;//2 ; //14;//14 ; //14 ; //11
+	FSMC_ReadWriteTimingStruct.FSMC_AddressHoldTime = 2 ; //2;//9 ; //10;//7 ; //14 ; //10
+	FSMC_ReadWriteTimingStruct.FSMC_DataSetupTime = 4 ; //4;//4 ;   //63;//94 ; //88 ;  //83 /* 1-255 */
 	FSMC_ReadWriteTimingStruct.FSMC_BusTurnAroundDuration = 0 ;
 
 
@@ -392,7 +392,7 @@ void SPI_SDD_Init(void){
     SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
     SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
     SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
     SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
     SPI_InitStructure.SPI_CRCPolynomial = 7;
     SPI_Init( SPI1, &SPI_InitStructure );
