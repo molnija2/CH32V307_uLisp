@@ -1,0 +1,58 @@
+
+(defun copy-file (source dest)
+ (if (and (stringp source) (stringp dest))
+  (with-sd-card (wrstr dest 2)
+   (with-sd-card (rdstr source 0)
+     (let ((c 0))
+      (loop
+         (setq c (read-byte rdstr))
+          (if (equal c nil) (return))
+          (write-byte c wrstr)
+       ))) t)
+  nil
+ )
+)
+
+
+
+(fill-rect 10 10 100 100 #x07e0)
+
+(save-rect 0 0 100 40 "PICTURE0.BIN")
+(load-rect 20 20  "PICTURE0.BIN")
+
+(copy-file "PICTURE0.BIN" "PICTURE1.BIN")
+(load-rect 20 20  "PICTURE1.BIN")
+
+
+ (defun test-font (ind name)
+     (load-font ind name)
+     (set-font ind)
+     (getfontinfo)
+ )
+ 
+ (test-font 2 "/FONTS/NIB11H8.BIN")
+ (test-font 3 "/FONTS/NIN16H12.BIN")
+ (test-font 4 "/FONTS/DEB15H9.BIN")
+ (test-font 5 "/FONTS/DED15H9.BIN")
+ (test-font 6 "/FONTS/DEN19H10.BIN")
+ (test-font 7 "/FONTS/NID18H13.BIN")
+ (test-font 8 "/FONTS/NIO12H8.BIN")
+ (test-font 9 "/FONTS/NIN12H7.BIN")
+  (test-font 10 "/FONTS/DEN16H9.BIN")
+ (test-font 11 "/FONTS/DRN15H8.BIN")
+ 
+"NIN12H7.BIN" "NIN22H14.BIN"
+"NIO12H8.BIN" "NIO16H12.BIN" "NIO21H16.BIN"
+"NIB11H8.BIN" "NIB21H15.BIN"
+"NID11H9.BIN" "NID18H13.BIN" "NID20H15.BIN" "NID21H16.BIN"
+
+"DEN16H9.BIN" "DEN19H10.BIN" "DEN27H15.BIN"
+"DEO15H8.BIN" "DEO16H9.BIN" "DEO18H10.BIN" "DEO27H16.BIN"
+"DEB15H9.BIN" "DEB19H11.BIN" "DEB27H14.BIN" 
+"DED15H9.BIN" "DED19H11.BIN"
+"DRN15H8.BIN"       
+
+
+8488 /FONTS/NIN12H7.BIN
+
+(loop (if (touch-press) (format t "x ~a  y ~a ~%" (touch-x-raw) (touch-y-raw))))
